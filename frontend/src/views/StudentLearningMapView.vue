@@ -1,120 +1,48 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ambilDaftarBab } from '../services/bab'
-import { ambilDaftarKuis } from '../services/kuis'
-import { getAvatar, getUser, SessionExpiredError } from '../services/auth'
-import logoImage from '../assets/logo-esikap.png'
-import avatarImage from '../assets/icons/avatar.svg'
+import { ambilDaftarPetaBelajar } from '../services/petaBelajar'
+import { getUser, SessionExpiredError } from '../services/auth'
 import StudentHeader from '../components/StudentHeader.vue'
 
 const router = useRouter()
 const user = ref(getUser())
-const avatar = ref(getAvatar() || avatarImage)
-const bab = ref([])
-const kuis = ref([])
+const roadmapList = ref([])
 const loading = ref(true)
 const errorMsg = ref('')
 const notice = ref('')
 
-const fallbackRoadmap = [
-  {
-    namaBab: 'Ejaan',
-    ringkasan: 'Prioritas utama. Nilai terakhir 60 — 2 dari 5 soal belum tepat.',
-    cakupan: 'kata baku, imbuhan di-, dan kata depan di.',
-    detail: '5 soal · nilai terakhir 60 · perlu diulang',
-    status: 'roadmap',
-  },
-  {
-    namaBab: 'Ejaan',
-    ringkasan: 'Sudah lulus dengan nilai 80, tapi Tahap 1 Kata Baku masih lemah.',
-    cakupan: 'kata baku, imbuhan di-, dan kata depan di.',
-    detail: '5 soal · nilai terakhir 80 · Tahap 1 perlu diperkuat',
-    status: 'roadmap',
-  },
-  {
-    namaBab: 'Paragraf',
-    ringkasan: 'Belum pernah dikerjakan. Terbuka setelah Tanda Baca mencapai nilai minimal 70.',
-    cakupan: 'kepaduan, pola pengembangan, dan kalimat topik.',
-    detail: '5 soal · belum ada nilai',
-    status: 'terkunci',
-  },
-  {
-    namaBab: 'Diksi',
-    ringkasan: 'Belum pernah dikerjakan. Dianjurkan setelah Paragraf selesai.',
-    cakupan: 'pilihan kata, makna denotatif dan referensi.',
-    detail: '5 soal · belum ada nilai',
-    status: 'terkunci',
-  },
-  {
-    namaBab: 'Kalimat Efektif',
-    ringkasan: 'Sudah kuat dengan nilai 94. Tidak perlu diulang.',
-    cakupan: 'kehematan, kesepadanan, kesejajaran, dan kelogisan.',
-    detail: '5 soal · nilai terakhir 94 · belum selesai',
-    status: 'roadmap',
-  },
-]
-
-const roadmap = computed(() => bab.value.map((item, index) => {
-  const kuisBab = kuis.value.filter((quiz) => String(quiz.idBab) === String(item.idBab))
-  const kuisTersedia = kuisBab.filter((quiz) => quiz.tersedia)
-  const selesai = kuisTersedia.filter((quiz) => quiz.statusBelajar === 'Selesai').length
-  const hasilTerakhir = kuisTersedia.find((quiz) => quiz.statusBelajar === 'Selesai')
-  const template = fallbackRoadmap[index % fallbackRoadmap.length]
-  const terkunci = !hasilTerakhir
-
-  return {
-    ...template,
-    namaBab: item.namaBab,
-    status: terkunci ? 'terkunci' : 'roadmap',
-    ringkasan: terkunci
-      ? 'Belum dibuka oleh dosen.'
-      : selesai
-        ? `${selesai} kuis selesai. Roadmap dapat digunakan untuk memperkuat materi bab ini.`
-        : 'Kuis bab ini sudah tersedia untuk dikerjakan.',
-    detail: terkunci
-      ? kuisTersedia.length ? 'Kerjakan kuis untuk membuka roadmap' : 'Belum ada kuis yang dibuka'
-      : `${selesai} dari ${kuisTersedia.length} kuis selesai`,
-    idPengerjaan: hasilTerakhir?.idPengerjaanTerakhir ?? null,
-  }
-}))
-
 function bukaRoadmap(item) {
-  if (item.status === 'terkunci' || !item.idPengerjaan) {
-    notice.value = `Roadmap ${item.namaBab} baru tersedia setelah Anda menyelesaikan kuis.`
+  if (item.status === 'terkunci' || item.selesaiCount === 0) {
+    notice.value = `Roadmap untuk ${item.namaBab} baru tersedia setelah Anda menyelesaikan kuis pada bab ini.`
     return
   }
-  const itemBab = bab.value.find((data) => data.namaBab === item.namaBab)
-  if (itemBab?.idBab) {
-    router.push({
-      path: `/peta-belajar/${itemBab.idBab}/roadmap`,
-      query: { pengerjaan: item.idPengerjaan },
-    })
-  }
-  else notice.value = `Roadmap ${item.namaBab} akan segera tersedia.`
+  router.push(`/peta-belajar/${item.idBab}/roadmap`)
 }
 
-function riwayatSoal(item) {
-  notice.value = `Riwayat soal ${item.namaBab} akan segera tersedia.`
+function bukaKuis(item) {
+  router.push(`/latihan/${item.idBab}`)
 }
 
-onMounted(async () => {
+async function muatPetaBelajar() {
+  loading.value = true
+  errorMsg.value = ''
   try {
-    const [dataBab, dataKuis] = await Promise.all([
-      ambilDaftarBab(),
-      ambilDaftarKuis(),
-    ])
-    bab.value = dataBab
-    kuis.value = dataKuis
+    const data = await ambilDaftarPetaBelajar()
+    roadmapList.value = data || []
   } catch (err) {
     if (err instanceof SessionExpiredError) {
       router.push('/')
       return
     }
-    errorMsg.value = err.message
+    errorMsg.value = err.message || 'Gagal memuat peta belajar.'
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  muatPetaBelajar()
 })
 </script>
 
@@ -122,30 +50,97 @@ onMounted(async () => {
   <div class="min-h-screen bg-wf-page text-wf-text">
     <StudentHeader active="peta" />
 
-    <main class="mx-auto max-w-[780px] px-6 pb-12 pt-8 sm:px-0">
-      <h1 class="text-[21px] font-bold sm:text-[23px]">Peta belajar saya, Bahasa Indonesia</h1>
-      <p class="mt-1 text-[14px] text-wf-secondary">Pilih bab untuk membuka roadmap belajarnya. Status tiap bab diambil dari nilai kuis terakhir Anda.</p>
-      <p v-if="notice" role="status" class="mt-4 rounded-md border border-wf-brand-border bg-wf-brand-soft px-4 py-3 text-sm text-wf-brand">{{ notice }}</p>
-      <p v-if="errorMsg" role="alert" class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-wf-no-text">{{ errorMsg }}</p>
-      <p v-if="loading" class="mt-6 text-wf-secondary">Memuat peta belajar...</p>
+    <main class="mx-auto max-w-[850px] px-6 pb-12 pt-8 sm:px-0">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 class="text-[21px] font-bold sm:text-[24px]">Peta Belajar Saya</h1>
+          <p class="mt-1 text-[14px] text-wf-secondary">
+            Roadmap disusun secara otomatis per bab berdasarkan analisis butir-butir soal kuis yang belum tepat menggunakan AI.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="rounded-xl border border-wf-border-subtle bg-wf-card px-4 py-2 text-xs font-semibold text-wf-secondary shadow-sm hover:border-wf-brand hover:text-wf-brand"
+          :disabled="loading"
+          @click="muatPetaBelajar"
+        >
+          {{ loading ? 'Memuat...' : '↻ Segarkan' }}
+        </button>
+      </div>
 
-      <section v-else class="mt-5 flex flex-col gap-3">
-        <article v-for="(item, index) in roadmap" :key="`${item.namaBab}-${index}`" class="grid gap-4 rounded-md border border-wf-border-subtle bg-wf-card p-4 sm:grid-cols-[32px_minmax(0,1fr)_290px] sm:items-center">
-          <div class="flex size-7 items-center justify-center rounded-full border-2 border-wf-brand text-sm">{{ index + 1 }}</div>
-          <div>
-            <h2 class="text-[14px] font-bold">{{ item.namaBab }}</h2>
-            <p class="mt-1 text-[12px] leading-5 text-wf-secondary">{{ item.ringkasan }}</p>
-            <p class="mt-1 text-[12px] leading-5 text-wf-secondary">Cakupan: {{ item.cakupan }}</p>
-            <p class="mt-1 text-[12px] text-wf-secondary">{{ item.detail }}</p>
+      <p v-if="notice" role="status" class="mt-4 rounded-md border border-wf-brand-border bg-wf-brand-soft px-4 py-3 text-sm text-wf-brand">
+        {{ notice }}
+      </p>
+      <p v-if="errorMsg" role="alert" class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-wf-no-text">
+        {{ errorMsg }}
+      </p>
+
+      <div v-if="loading" class="mt-8 flex flex-col items-center justify-center py-12 text-center">
+        <div class="size-8 animate-spin rounded-full border-4 border-wf-brand border-t-transparent"></div>
+        <p class="mt-3 text-sm text-wf-secondary">Memuat peta belajar dan analisis materi...</p>
+      </div>
+
+      <section v-else-if="roadmapList.length" class="mt-6 flex flex-col gap-3">
+        <article
+          v-for="(item, index) in roadmapList"
+          :key="item.idBab"
+          class="grid gap-4 rounded-xl border border-wf-border-subtle bg-wf-card p-5 sm:grid-cols-[36px_minmax(0,1fr)_260px] sm:items-center transition-all hover:shadow-sm"
+        >
+          <!-- Nomor Urut -->
+          <div
+            class="flex size-8 items-center justify-center rounded-full border-2 text-sm font-bold"
+            :class="item.status === 'terkunci' ? 'border-gray-300 text-gray-400' : 'border-wf-brand text-wf-brand'"
+          >
+            {{ index + 1 }}
           </div>
-          <div class="flex flex-wrap justify-start gap-3 sm:justify-end">
-            <button type="button" class="rounded-xl border border-wf-brand-border px-4 py-3 text-sm font-semibold text-wf-brand hover:bg-wf-brand-soft" @click="riwayatSoal(item)">
-              RIWAYAT SOAL
+
+          <!-- Keterangan Bab -->
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="text-[16px] font-bold text-wf-text">{{ item.namaBab }}</h2>
+              <span
+                v-if="item.status === 'sempurna'"
+                class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200"
+              >
+                ✓ Tuntas Sempurna
+              </span>
+              <span
+                v-else-if="item.status === 'roadmap'"
+                class="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 border border-amber-200"
+              >
+                {{ item.totalSoalSalah !== null ? `${item.totalSoalSalah} soal perlu diperkuat` : 'Roadmap Siap' }}
+              </span>
+              <span
+                v-else
+                class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600 border border-gray-200"
+              >
+                Terkunci
+              </span>
+            </div>
+
+            <p class="mt-1 text-[13px] leading-5 text-wf-secondary">{{ item.ringkasan }}</p>
+            <p v-if="item.deskripsi" class="mt-1 text-[12px] text-wf-secondary/80">Cakupan: {{ item.deskripsi }}</p>
+            <p class="mt-1 text-[12px] font-medium text-wf-brand">
+              Progres: {{ item.selesaiCount }} dari {{ item.totalKuis }} kuis diselesaikan
+              <span v-if="item.jumlahTahap > 0">· {{ item.jumlahTahap }} tahap belajar disiapkan AI</span>
+            </p>
+          </div>
+
+          <!-- Tombol Aksi -->
+          <div class="flex flex-wrap justify-start gap-2.5 sm:justify-end">
+            <button
+              type="button"
+              class="rounded-xl border border-wf-brand-border px-3.5 py-2.5 text-xs font-semibold text-wf-brand hover:bg-wf-brand-soft"
+              @click="bukaKuis(item)"
+            >
+              DAFTAR KUIS
             </button>
             <button
               type="button"
-              class="rounded-xl px-4 py-3 text-sm font-semibold"
-              :class="item.status === 'terkunci' ? 'border border-red-400 text-wf-no-text' : 'bg-wf-brand text-white hover:bg-wf-accent-hover'"
+              class="rounded-xl px-4 py-2.5 text-xs font-semibold shadow-sm transition"
+              :class="item.status === 'terkunci'
+                ? 'border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                : 'bg-wf-brand text-white hover:bg-wf-accent-hover'"
               :disabled="item.status === 'terkunci'"
               @click="bukaRoadmap(item)"
             >
@@ -154,6 +149,10 @@ onMounted(async () => {
           </div>
         </article>
       </section>
+
+      <div v-else class="mt-8 rounded-xl border border-dashed border-wf-border p-8 text-center text-wf-secondary">
+        Belum ada bab materi yang terdaftar.
+      </div>
     </main>
   </div>
 </template>

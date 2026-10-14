@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../config/db.js';
 import { successResponse, errorResponse } from '../models/apiResponse.js';
 import { evaluateQuiz } from '../services/fuzzyService.js';
 import { samaPassword } from '../utils/passwordKuis.js';
+import { generateOrUpdateRoadmapBab } from '../services/roadmapService.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SOAL_SELECT =
@@ -276,7 +277,7 @@ export const submitPengerjaan = async (req, res) => {
     }
 
     const [{ data: kuis, error: kuisError }, { data: questions, error: questionsError }] = await Promise.all([
-      supabaseAdmin.from('Kuis').select('idKuis, judul, durasi').eq('idKuis', attempt.idKuis).maybeSingle(),
+      supabaseAdmin.from('Kuis').select('idKuis, idBab, judul, durasi').eq('idKuis', attempt.idKuis).maybeSingle(),
       getQuizQuestions(attempt.idKuis),
     ]);
     if (kuisError) return dbError(res, kuisError, 'Gagal memuat kuis.');
@@ -344,6 +345,13 @@ export const submitPengerjaan = async (req, res) => {
     const nilai = questions.length > 0
       ? Math.round((result.totalBenar / questions.length) * 100)
       : 0;
+
+    // Perbarui peta belajar bab terkait di latar belakang menggunakan AI
+    if (kuis?.idBab) {
+      generateOrUpdateRoadmapBab(req.currentUser.id, kuis.idBab).catch((err) => {
+        console.error('[PengerjaanController] Gagal memperbarui roadmap bab latar belakang:', err.message);
+      });
+    }
 
     return res.json(successResponse({
       message: 'Kuis berhasil dikirim dan dinilai.',
