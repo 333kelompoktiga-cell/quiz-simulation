@@ -44,6 +44,17 @@ function ulangi(item) {
   notice.value = `Kuis "${item.judul}" belum memiliki ID UUID yang valid dari server.`
 }
 
+function lihatHasil(item) {
+  if (!item.idPengerjaanTerakhir) {
+    notice.value = `Hasil kuis "${item.judul}" belum tersedia.`
+    return
+  }
+  router.push({
+    path: `/kuis/${item.idKuis}/hasil`,
+    query: { pengerjaan: item.idPengerjaanTerakhir },
+  })
+}
+
 // Satu bab bisa berisi kuis dari beberapa dosen, jadi ringkasan menyebut
 // semua dosen pembuat kuis di bab ini.
 const daftarPembuat = computed(() => [
@@ -87,10 +98,14 @@ onMounted(async () => {
     <StudentHeader active="latihan" />
 
     <main class="mx-auto max-w-[1000px] px-6 pb-12 pt-9 sm:px-10 lg:px-0">
-      <p class="font-mono text-[13px] uppercase tracking-[0.12em] text-wf-secondary">
-        <RouterLink to="/dashboard" class="hover:text-wf-brand">← Bab</RouterLink>
-        <span class="mx-2">/</span>{{ bab?.namaBab || 'Memuat...' }}
-      </p>
+      <div class="flex flex-wrap items-center gap-3">
+        <RouterLink to="/dashboard" class="tombol-kembali">
+          <span aria-hidden="true" class="text-xl leading-none">←</span>
+          <span>KEMBALI KE LATIHAN</span>
+        </RouterLink>
+        <span class="text-wf-muted" aria-hidden="true">/</span>
+        <span class="font-mono text-[13px] uppercase tracking-[0.12em] text-wf-secondary">{{ bab?.namaBab || 'Memuat...' }}</span>
+      </div>
       <h1 class="mt-4 text-[27px] font-bold sm:text-[30px]">{{ bab?.namaBab || 'Latihan' }}</h1>
       <p class="mt-1 text-[16px] text-wf-secondary">{{ formatRingkasan() }}</p>
       <RouterLink to="/pembahasan-demo" class="mt-4 inline-flex rounded-xl border border-wf-brand-border px-4 py-2 text-sm font-semibold text-wf-brand hover:bg-wf-brand-soft">
@@ -136,9 +151,24 @@ onMounted(async () => {
                     <span v-else>—</span>
                   </p>
                 </div>
-                <button type="button" class="rounded-xl border border-wf-brand-border px-5 py-4 text-[20px] font-semibold text-wf-brand hover:bg-wf-brand-soft disabled:cursor-not-allowed disabled:opacity-50" :disabled="!item.tersedia" @click="ulangi(item)">
-                  {{ item.statusBelajar === 'Selesai' ? 'ULANGI' : 'MULAI' }}
-                </button>
+                <div class="flex flex-wrap justify-end gap-3">
+                  <button
+                    v-if="item.statusBelajar === 'Selesai'"
+                    type="button"
+                    class="rounded-xl border-2 border-wf-brand bg-wf-brand-soft px-5 py-4 text-[18px] font-bold text-wf-brand hover:bg-wf-brand hover:text-white"
+                    @click="lihatHasil(item)"
+                  >
+                    LIHAT HASIL
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-xl border border-wf-brand-border px-5 py-4 text-[18px] font-semibold text-wf-brand hover:bg-wf-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="!item.tersedia"
+                    @click="ulangi(item)"
+                  >
+                    {{ item.statusBelajar === 'Selesai' ? 'ULANGI' : 'MULAI' }}
+                  </button>
+                </div>
               </div>
             </div>
           </article>

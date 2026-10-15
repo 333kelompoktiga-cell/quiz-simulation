@@ -73,10 +73,14 @@ async function handleLogout() {
     <StudentHeader />
 
     <main class="mx-auto max-w-[1200px] px-6 pb-12 pt-8 sm:px-10 lg:px-0">
-      <p class="font-mono text-xs uppercase tracking-[0.12em] text-wf-secondary">
-        <RouterLink to="/profil" class="hover:text-wf-brand">← Akun saya</RouterLink>
-        <span class="mx-2">/</span> Edit akun <span class="mx-2">/</span> Edit foto
-      </p>
+      <div class="flex flex-wrap items-center gap-3">
+        <RouterLink to="/profil" class="tombol-kembali">
+          <span aria-hidden="true" class="text-xl leading-none">←</span>
+          KEMBALI KE AKUN SAYA
+        </RouterLink>
+        <span class="text-wf-muted" aria-hidden="true">/</span>
+        <span class="font-mono text-xs uppercase tracking-[0.12em] text-wf-secondary">Edit akun / Edit foto</span>
+      </div>
       <h1 class="mt-4 text-[26px] font-bold sm:text-[30px]">Edit foto</h1>
 
       <section class="mt-7 max-w-2xl rounded-md border border-wf-border-subtle bg-wf-card p-6 sm:p-8">

@@ -60,8 +60,9 @@ onMounted(async () => {
     <StudentHeader active="latihan" />
 
     <main class="mx-auto max-w-[900px] px-6 pb-12 pt-8 sm:px-0">
-      <button type="button" class="font-mono text-[13px] uppercase tracking-[0.12em] text-wf-brand" @click="kembaliKeHasil">
-        ← Kembali ke hasil kuis
+      <button type="button" class="tombol-kembali" @click="kembaliKeHasil">
+        <span aria-hidden="true" class="text-xl leading-none">←</span>
+        KEMBALI KE HASIL KUIS
       </button>
       <p v-if="loading" class="mt-7 text-wf-secondary">Menyusun laporan diagnostik...</p>
       <p v-else-if="errorMsg" role="alert" class="mt-7 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-wf-no-text">{{ errorMsg }}</p>
@@ -108,7 +109,10 @@ onMounted(async () => {
 
         <div class="mt-6 flex flex-wrap gap-3">
           <RouterLink to="/peta-belajar" class="rounded-xl bg-wf-accent px-5 py-3 font-semibold text-white hover:bg-wf-accent-hover">BUKA LEARNING ROADMAP</RouterLink>
-          <button type="button" class="rounded-xl border border-wf-brand-border px-5 py-3 font-semibold text-wf-brand hover:bg-wf-brand-soft" @click="kembaliKeHasil">KEMBALI KE HASIL</button>
+          <button type="button" class="tombol-kembali" @click="kembaliKeHasil">
+            <span aria-hidden="true" class="text-xl leading-none">←</span>
+            KEMBALI KE HASIL
+          </button>
         </div>
       </template>
     </main>

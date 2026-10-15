@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ambilBab } from '../services/bab'
 import { ambilHasilPengerjaan } from '../services/kuis'
 import { getAvatar, getUser, SessionExpiredError } from '../services/auth'
@@ -9,6 +9,7 @@ import avatarImage from '../assets/icons/avatar.svg'
 import StudentHeader from '../components/StudentHeader.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
+const route = useRoute()
 const router = useRouter()
 const user = ref(getUser())
 const avatar = ref(getAvatar() || avatarImage)
@@ -83,10 +84,14 @@ onMounted(async () => {
     <StudentHeader active="peta" />
 
     <main class="mx-auto max-w-[1000px] px-6 pb-12 pt-9 sm:px-10 lg:px-0">
-      <p class="font-mono text-[13px] uppercase tracking-[0.12em] text-wf-secondary">
-        <RouterLink to="/peta-belajar" class="hover:text-wf-brand">← Peta belajar</RouterLink>
-        <span class="mx-2">/</span>{{ namaBab }}
-      </p>
+      <div class="flex flex-wrap items-center gap-3">
+        <RouterLink to="/peta-belajar" class="tombol-kembali">
+          <span aria-hidden="true" class="text-xl leading-none">←</span>
+          <span>KEMBALI KE PETA BELAJAR</span>
+        </RouterLink>
+        <span class="text-wf-muted" aria-hidden="true">/</span>
+        <span class="font-mono text-[13px] uppercase tracking-[0.12em] text-wf-secondary">{{ namaBab }}</span>
+      </div>
       <h1 class="mt-5 text-[27px] font-bold sm:text-[30px]">Roadmap bab {{ namaBab }}</h1>
       <p class="mt-1 text-[17px] text-wf-secondary">
         Bahasa Indonesia · {{ tahap.length }} tahap · nilai terakhir {{ nilaiTerakhir }}. Urutan tahap di dalam bab ini beserta status penguasaan Anda.
@@ -104,8 +109,9 @@ onMounted(async () => {
             <p class="mt-2 text-[16px] leading-6 text-wf-secondary"><strong class="font-medium text-wf-text">Kegiatan:</strong> {{ item.kegiatan }}</p>
           </div>
         </article>
-        <RouterLink to="/peta-belajar" class="mt-3 w-fit rounded-xl bg-wf-accent px-6 py-3 text-[18px] font-bold text-white hover:bg-wf-accent-hover">
-          ← KEMBALI
+        <RouterLink to="/peta-belajar" class="tombol-kembali mt-3">
+          <span aria-hidden="true" class="text-xl leading-none">←</span>
+          KEMBALI KE PETA BELAJAR
         </RouterLink>
       </section>
     </main>

@@ -130,8 +130,9 @@ onMounted(async () => {
         </div>
 
         <div class="mt-5 flex items-center justify-between gap-3">
-          <button type="button" class="rounded-xl border border-wf-brand-border px-4 py-3 font-semibold text-wf-brand disabled:opacity-40" :disabled="nomorAktif === 0" @click="nomorAktif -= 1">
-            ← KEMBALI
+          <button type="button" class="tombol-kembali disabled:cursor-not-allowed disabled:opacity-40" :disabled="nomorAktif === 0" @click="nomorAktif -= 1">
+            <span aria-hidden="true" class="text-xl leading-none">←</span>
+            KEMBALI
           </button>
           <span class="font-mono text-xs font-bold text-wf-secondary">SOAL {{ nomorAktif + 1 }} DARI {{ soal.length }}</span>
           <button type="button" class="rounded-xl bg-wf-accent px-5 py-3 font-semibold text-white disabled:opacity-40" :disabled="nomorAktif === soal.length - 1" @click="nomorAktif += 1">
