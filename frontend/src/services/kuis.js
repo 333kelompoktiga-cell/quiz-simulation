@@ -41,6 +41,14 @@ export async function ambilKuis(idKuis) {
   return (await panggil(`/kuis/${idKuis}`, { method: 'GET' })).data
 }
 
+export async function ambilDosenPengelola() {
+  return (await panggil('/kuis/dosen-pengelola', { method: 'GET' })).data
+}
+
+export async function ubahAksesKuis(idKuis, data) {
+  return (await panggil(`/kuis/${idKuis}/akses`, { method: 'PUT', body: data })).data
+}
+
 export async function buatKuis(data) {
   return (await panggil('/kuis', { body: data })).data
 }

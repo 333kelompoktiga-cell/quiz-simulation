@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import HakAksesKuis from '../components/HakAksesKuis.vue'
 import AdminHeader from '../components/AdminHeader.vue'
 import TombolKembali from '../components/TombolKembali.vue'
 import { takeNotice, SessionExpiredError } from '../services/auth'
@@ -19,6 +20,12 @@ const memuat = ref(true)
 const gagalMuat = ref(false)
 const errorMsg = ref('')
 const infoMsg = ref('')
+const kuisAkses = ref(null)
+function aksesTersimpan(hasil) {
+  daftarKuis.value = daftarKuis.value.map((k) => k.idKuis === hasil.idKuis ? { ...k, ...hasil } : k)
+  kuisAkses.value = null
+  infoMsg.value = 'Hak akses kuis berhasil disimpan.'
+}
 const cari = ref('')
 const filterStatus = ref('semua')
 
@@ -42,11 +49,11 @@ function formatTanggal(iso) {
 
 // Bab dipakai bersama, jadi satu bab bisa berisi kuis dari beberapa dosen.
 // bisaDikelola dari backend: false = kuis dosen lain, hanya bisa dilihat.
-const milikSendiri = (kuis) => kuis.bisaDikelola !== false
+const bolehKelola = (kuis) => kuis.bisaDikelola === true
 
 function keteranganKuis(kuis) {
   const bagian = [`Dibuat ${formatTanggal(kuis.tanggalDibuat)}`]
-  if (kuis.namaPembuat) bagian.push(`oleh ${milikSendiri(kuis) ? 'Anda' : kuis.namaPembuat}`)
+  if (kuis.namaPembuat) bagian.push(`oleh ${kuis.bisaAturAkses ? 'Anda' : kuis.namaPembuat}`)
   if (kuis.jumlahSoal != null) bagian.push(`${kuis.jumlahSoal} soal`)
   if (kuis.durasi) bagian.push(`${kuis.durasi} menit`)
   if (kuis.deskripsi) bagian.push(kuis.deskripsi)
@@ -97,24 +104,29 @@ async function handleHapus(kuis) {
 
 // ── Password kuis ──
 // Password dibuat otomatis sekali oleh backend saat kuis dibuat. Menyimpan atau
-// mengedit kuis TIDAK mengubahnya; hanya tombol "Generate password baru" di pop-up
-// yang membuat password baru.
+// mengedit kuis tidak mengubahnya. Pengelola dapat mengganti lewat generate atau isi manual.
 
 const idKuisPassword = ref(null)
 const membuatPassword = ref(false)
 const tersalin = ref(false)
 const errorPassword = ref('')
+const passwordManual = ref('')
+const infoPassword = ref('')
+const passwordManualValid = computed(() => /^[\x21-\x7E]{8}$/.test(passwordManual.value))
 let timerSalin = null
 
 const kuisPassword = computed(() => daftarKuis.value.find((k) => k.idKuis === idKuisPassword.value) ?? null)
 
 function bukaPassword(kuis) {
   errorPassword.value = ''
+  infoPassword.value = ''
+  passwordManual.value = ''
   tersalin.value = false
   idKuisPassword.value = kuis.idKuis
 }
 
 function tutupPassword() {
+  if (membuatPassword.value) return
   idKuisPassword.value = null
 }
 
@@ -135,20 +147,31 @@ async function salinPassword() {
   }
 }
 
-async function generatePasswordBaru() {
+async function simpanPassword(manual = false) {
   const kuis = kuisPassword.value
-  if (!kuis) return
-  if (kuis.pin && !window.confirm('Password lama tidak akan berlaku lagi. Buat password baru?')) return
-
+  if (!kuis || membuatPassword.value) return
   errorPassword.value = ''
+  infoPassword.value = ''
+  if (manual && !passwordManualValid.value) {
+    errorPassword.value = 'Password harus tepat 8 karakter: huruf, angka, atau simbol tanpa spasi.'
+    return
+  }
+  if (manual && passwordManual.value === kuis.pin) {
+    errorPassword.value = 'Password baru masih sama dengan password saat ini.'
+    return
+  }
+  if (kuis.pin && !window.confirm('Password lama tidak akan berlaku lagi. Ganti password kuis?')) return
+
   membuatPassword.value = true
   try {
-    // Backend membuat password baru saat menerima generatePin: true.
-    const hasil = await ubahKuis(kuis.idKuis, { generatePin: true })
+    const hasil = await ubahKuis(kuis.idKuis, manual ? { pin: passwordManual.value } : { generatePin: true })
     daftarKuis.value = daftarKuis.value.map((k) =>
       k.idKuis === kuis.idKuis ? { ...k, pin: hasil.pin, adaPin: true } : k,
     )
     tersalin.value = false
+    clearTimeout(timerSalin)
+    passwordManual.value = ''
+    infoPassword.value = 'Password kuis berhasil diperbarui.'
   } catch (err) {
     if (err instanceof SessionExpiredError) {
       router.push('/')
@@ -164,6 +187,7 @@ async function generatePasswordBaru() {
 <template>
   <div class="min-h-screen bg-wf-page text-wf-text">
     <AdminHeader />
+    <HakAksesKuis v-if="kuisAkses" :key="kuisAkses.idKuis" :kuis="kuisAkses" @tutup="kuisAkses = null" @tersimpan="aksesTersimpan" />
 
     <main class="px-4 sm:px-10 lg:px-20 py-10 flex flex-col gap-6">
       <div class="flex flex-col gap-2">
@@ -262,6 +286,7 @@ async function generatePasswordBaru() {
               <h3 class="text-[19px] leading-[26px] font-semibold">{{ kuis.judul }}</h3>
               <p class="font-mono text-[14px] lg:text-[15px] leading-5 tracking-[1px] text-wf-muted">
                 {{ keteranganKuis(kuis) }}
+                <span v-if="kuis.bisaDikelola"> &middot; {{ kuis.aksesKelola === 'semua' ? 'Dikelola semua dosen' : kuis.aksesKelola === 'tertentu' ? 'Dikelola dosen tertentu' : 'Pribadi' }}</span>
               </p>
             </div>
 
@@ -273,7 +298,8 @@ async function generatePasswordBaru() {
               >
                 {{ kuis.status === 'terbit' ? 'Terbit' : 'Draf' }}
               </span>
-              <template v-if="milikSendiri(kuis)">
+              <button v-if="kuis.bisaAturAkses" type="button" class="tombol-aksi" @click="kuisAkses = kuis">Hak Akses</button>
+              <template v-if="bolehKelola(kuis)">
                 <button
                   type="button"
                   @click="bukaPassword(kuis)"
@@ -283,7 +309,7 @@ async function generatePasswordBaru() {
                 </button>
                 <RouterLink :to="`/kuis/${kuis.idKuis}/soal`" class="tombol-aksi">Edit Soal</RouterLink>
                 <RouterLink :to="`/kuis/${kuis.idKuis}/edit`" class="tombol-aksi">Edit</RouterLink>
-                <button type="button" @click="handleHapus(kuis)" class="tombol-aksi-bahaya">Hapus</button>
+                <button v-if="kuis.bisaAturAkses" type="button" @click="handleHapus(kuis)" class="tombol-aksi-bahaya">Hapus</button>
               </template>
               <RouterLink v-else :to="`/kuis/${kuis.idKuis}/soal`" class="tombol-aksi">Lihat</RouterLink>
             </div>
@@ -302,7 +328,7 @@ async function generatePasswordBaru() {
         role="dialog"
         aria-modal="true"
         aria-labelledby="judul-password"
-        class="w-full max-w-[460px] bg-wf-card border border-wf-border-subtle rounded-xl p-6 flex flex-col gap-5 shadow-lg"
+        class="w-full max-w-[460px] max-h-[90vh] overflow-y-auto bg-wf-card border border-wf-border-subtle rounded-xl p-6 flex flex-col gap-5 shadow-lg"
       >
         <div class="flex flex-col gap-1">
           <p class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">PASSWORD KUIS</p>
@@ -329,15 +355,42 @@ async function generatePasswordBaru() {
           Kuis ini belum punya password, jadi belum bisa dikerjakan mahasiswa. Klik tombol di bawah untuk membuatnya.
         </p>
 
+        <form class="flex flex-col gap-3" @submit.prevent="simpanPassword(true)">
+          <label for="password-manual" class="font-semibold text-[17px]">Isi password manual</label>
+          <input
+            id="password-manual"
+            v-model="passwordManual"
+            type="text"
+            minlength="8"
+            maxlength="8"
+            required
+            pattern="[!-~]{8}"
+            autocomplete="off"
+            autocapitalize="off"
+            :spellcheck="false"
+            :disabled="membuatPassword"
+            aria-describedby="petunjuk-password-manual"
+            class="w-full rounded-md border border-wf-border bg-wf-muted-surface px-4 py-3 font-mono text-[20px] focus:outline-none focus:ring-2 focus:ring-wf-brand"
+          />
+          <p id="petunjuk-password-manual" class="text-[15px] text-wf-secondary">
+            Tepat 8 karakter, boleh huruf, angka, atau simbol tanpa spasi. Huruf besar dan kecil dibedakan.
+            {{ passwordManual.length }}/8 karakter.
+          </p>
+          <button type="submit" :disabled="membuatPassword || !passwordManualValid || passwordManual === kuisPassword.pin" class="tombol-aksi disabled:opacity-60">
+            {{ membuatPassword ? 'Menyimpan...' : 'Simpan password manual' }}
+          </button>
+        </form>
+
+        <p v-if="infoPassword" role="status" class="text-[15px] text-green-800">{{ infoPassword }}</p>
         <p v-if="errorPassword" role="alert" class="rounded-md bg-red-50 border border-wf-no-border px-4 py-3 text-[15px] text-wf-no-text">
           {{ errorPassword }}
         </p>
 
         <div class="flex flex-wrap justify-end gap-3">
-          <button type="button" @click="tutupPassword" class="tombol-aksi">Tutup</button>
+          <button type="button" @click="tutupPassword" :disabled="membuatPassword" class="tombol-aksi">Tutup</button>
           <button
             type="button"
-            @click="generatePasswordBaru"
+            @click="simpanPassword(false)"
             :disabled="membuatPassword"
             class="rounded-xl bg-wf-accent hover:bg-wf-accent-hover px-5 py-3 text-[17px] leading-6 font-semibold tracking-[0.2px] text-white disabled:opacity-60"
           >

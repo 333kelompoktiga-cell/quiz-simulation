@@ -1,3 +1,5 @@
+import { verifyLoggedIn } from '../middleware/verifyLoggedIn.js';
+import { verifyAdmin } from '../middleware/verifyAdmin.js';
 // routes/soalImport.routes.js
 import express from 'express';
 import multer from 'multer';
@@ -17,7 +19,7 @@ const upload = multer({
 });
 
 // POST /api/soal/import-pdf
-router.post('/import-pdf', (req, res, next) => {
+router.post('/import-pdf', verifyLoggedIn, verifyAdmin, (req, res, next) => {
   upload.single('file')(req, res, (err) => {
     if (err) return res.status(400).json({ success: false, message: err.message });
     next();

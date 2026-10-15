@@ -1,3 +1,5 @@
+import { supabaseAdmin } from '../config/db.js';
+import { bisaDikelola, KOLOM_AKSES_KUIS } from '../utils/aksesKuis.js';
 // controllers/SoalImportController.js
 import {
   UUID_PATTERN,
@@ -23,6 +25,16 @@ export async function importSoalFromPdf(req, res) {
 
     if (upload && !UUID_PATTERN.test(idKuis)) {
       return res.status(400).json({ success: false, message: 'idKuis harus berupa UUID yang valid.' });
+    }
+
+    if (upload) {
+      const { data: kuis, error } = await supabaseAdmin.from('Kuis')
+        .select(KOLOM_AKSES_KUIS).eq('idKuis', idKuis).maybeSingle();
+      if (error) throw error;
+      if (!kuis) return res.status(404).json({ success: false, message: 'Kuis tidak ditemukan.' });
+      if (!bisaDikelola(kuis, req.currentUser)) {
+        return res.status(403).json({ success: false, message: 'Kamu belum diberi hak untuk mengelola kuis ini.' });
+      }
     }
 
     const rawText = await extractTextFromBuffer(req.file.buffer, startPage, endPage);
