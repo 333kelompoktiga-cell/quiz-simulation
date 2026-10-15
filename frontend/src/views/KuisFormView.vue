@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminHeader from '../components/AdminHeader.vue'
+import TombolKembali from '../components/TombolKembali.vue'
 import KuisBukanMilik from '../components/KuisBukanMilik.vue'
 import { setNotice, SessionExpiredError } from '../services/auth'
 import { ambilDaftarBab, ambilKuis, ubahKuis } from '../services/kuis'
@@ -88,8 +89,9 @@ async function simpan() {
 
     <main class="px-4 sm:px-10 lg:px-20 pt-10 pb-14 flex flex-col gap-6">
       <div class="flex flex-col gap-2">
-        <p class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">
-          <RouterLink to="/bab" class="hover:underline">← Bab</RouterLink>
+        <TombolKembali :to="tautanKembali" class="mb-2" />
+        <p class="font-mono text-[18px] leading-7 tracking-[1px] text-wf-text">
+          <RouterLink to="/bab" class="hover:underline">Bab</RouterLink>
           <template v-if="namaBabAsal">
             / <RouterLink :to="tautanKembali" class="hover:underline uppercase">{{ namaBabAsal }}</RouterLink>
           </template>

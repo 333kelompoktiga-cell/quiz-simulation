@@ -5,6 +5,9 @@ import {
   fuzzifyResponseTime,
   fuzzifyDifficulty,
   defuzzifyCentroid,
+  normalizeCentroid,
+  MIN_CENTROID,
+  MAX_CENTROID,
   mapScoreToLevel,
   RULES,
   LINGUISTIC_LEVELS,
@@ -132,10 +135,10 @@ console.log('Running Fuzzy Autograding Service Tests...\n');
   assert(mapScoreToLevel(15) === LINGUISTIC_LEVELS.SANGAT_RENDAH, 'Score 15 -> Sangat Rendah');
   assert(mapScoreToLevel(34.9) === LINGUISTIC_LEVELS.SANGAT_RENDAH, 'Score 34.9 -> Sangat Rendah');
   assert(mapScoreToLevel(35.0) === LINGUISTIC_LEVELS.RENDAH, 'Score 35.0 -> Rendah');
-  assert(mapScoreToLevel(54.9) === LINGUISTIC_LEVELS.RENDAH, 'Score 54.9 -> Rendah');
-  assert(mapScoreToLevel(55.0) === LINGUISTIC_LEVELS.SEDANG, 'Score 55.0 -> Sedang');
-  assert(mapScoreToLevel(74.9) === LINGUISTIC_LEVELS.SEDANG, 'Score 74.9 -> Sedang');
-  assert(mapScoreToLevel(75.0) === LINGUISTIC_LEVELS.TINGGI, 'Score 75.0 -> Tinggi');
+  assert(mapScoreToLevel(59.9) === LINGUISTIC_LEVELS.RENDAH, 'Score 59.9 -> Rendah');
+  assert(mapScoreToLevel(60.0) === LINGUISTIC_LEVELS.SEDANG, 'Score 60.0 -> Sedang');
+  assert(mapScoreToLevel(79.9) === LINGUISTIC_LEVELS.SEDANG, 'Score 79.9 -> Sedang');
+  assert(mapScoreToLevel(80.0) === LINGUISTIC_LEVELS.TINGGI, 'Score 80.0 -> Tinggi');
   assert(mapScoreToLevel(95) === LINGUISTIC_LEVELS.TINGGI, 'Score 95.0 -> Tinggi');
 }
 
@@ -249,8 +252,18 @@ console.log('Running Fuzzy Autograding Service Tests...\n');
 
   assert(profilMahir.akurasi === 100.0, 'Profil 4: Akurasi sempurna (100%)');
   assert(profilMahir.kategoriFuzzy === LINGUISTIC_LEVELS.TINGGI, 'Profil 4: Kategori Tinggi');
-  assert(profilMahir.skorFuzzy >= 80, `Profil 4: Skor fuzzy sangat tinggi (>=80): ${profilMahir.skorFuzzy}`);
+  assert(profilMahir.skorFuzzy === 100.0, `Profil 4: Skor fuzzy sempurna (100): ${profilMahir.skorFuzzy}`);
+  assert(profilMahir.rawSkorFuzzy === 86.04, `Profil 4: Raw centroid score terlacak (86.04): ${profilMahir.rawSkorFuzzy}`);
   assert(profilMahir.rekomendasi.includes('sangat mengesankan') || profilMahir.rekomendasi.includes('sangat tinggi'), 'Profil 4: Rekomendasi apresiasi tinggi');
+}
+
+// 11. Normalization & Audit Trail
+{
+  assert(normalizeCentroid(MAX_CENTROID) === 100.0, 'Max centroid 86.04 maps to 100.0');
+  assert(normalizeCentroid(MIN_CENTROID) === 0.0, 'Min centroid 13.96 maps to 0.0');
+  const singleItem = evaluateItem({ isCorrect: true, responseTime: 10, difficulty: 'Mudah' });
+  assert(singleItem.crispScore === 100.0, 'Single item perfect score normalized to 100.0');
+  assert(singleItem.rawCentroidScore === 86.04, 'Single item raw centroid preserved at 86.04');
 }
 
 console.log(`\nSummary: ${passedTests} passed, ${failedTests} failed`);

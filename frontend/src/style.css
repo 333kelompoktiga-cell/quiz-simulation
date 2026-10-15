@@ -34,8 +34,8 @@
 /* Tombol aksi kecil di baris daftar admin (Edit, Hapus, Edit Soal).
    Varian outline dari komponen Button di Figma: aksi sekunder. */
 @utility tombol-aksi {
-  @apply inline-flex items-center justify-center gap-1 rounded-xl border border-wf-brand-border bg-wf-card px-4 py-2
-    text-[15px] leading-6 font-semibold tracking-[0.2px] text-wf-brand transition
+  @apply inline-flex items-center justify-center gap-1 min-w-[104px] rounded-xl border border-wf-brand-border bg-wf-card px-6 py-2.5
+    text-[16px] leading-6 font-semibold tracking-[0.2px] text-wf-brand transition
     hover:bg-wf-brand-soft disabled:opacity-60 disabled:cursor-not-allowed;
 }
 

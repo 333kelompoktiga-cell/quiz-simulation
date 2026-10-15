@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminHeader from '../components/AdminHeader.vue'
-import { SessionExpiredError, takeNotice } from '../services/auth'
+import { SessionExpiredError, takeNotice, getUser } from '../services/auth'
 import { ambilDaftarBab, hapusBab } from '../services/bab'
 import { ambilDaftarKuis } from '../services/kuis'
 
@@ -12,6 +12,11 @@ const router = useRouter()
 
 const daftarBab = ref([])
 const jumlahKuisPerBab = ref(new Map())
+// Nama dosen pembuat kuis per bab, dan nama dosen per idUser dari daftar kuis.
+// GET /bab hanya mengirim id pembuat bab (dibuatOleh), jadi namanya dicari di sini.
+const pembuatKuisPerBab = ref(new Map())
+const namaDosen = ref(new Map())
+const idSaya = getUser()?.id_user
 const loading = ref(true)
 const search = ref('')
 const filterStatus = ref('semua')
@@ -42,11 +47,29 @@ function jumlahKuis(bab) {
   return jumlahKuisPerBab.value.get(bab.idBab) ?? 0
 }
 
+// Pembuat bab ditulis "Anda" kalau milik sendiri. Nama dosen lain diambil dari
+// backend kalau sudah dikirim, atau dari kuis yang pernah dia buat.
+function pembuatBab(bab) {
+  if (bab.dibuatOleh && bab.dibuatOleh === idSaya) return 'Anda'
+  return bab.namaPembuat ?? namaDosen.value.get(bab.dibuatOleh) ?? null
+}
+
+function daftarPembuat(bab) {
+  const nama = new Set()
+  const babOleh = pembuatBab(bab)
+  if (babOleh) nama.add(babOleh)
+  for (const n of pembuatKuisPerBab.value.get(bab.idBab) ?? []) nama.add(n)
+  return [...nama]
+}
+
 function keteranganBab(bab) {
   const tanggal = bab.tanggalDiupdate
     ? `Diperbarui ${formatTanggal(bab.tanggalDiupdate)}`
     : `Dibuat ${formatTanggal(bab.tanggalDibuat)}`
-  return `Bab ${bab.urutanBab} · ${tanggal} · dipakai ${jumlahKuis(bab)} kuis`
+  const bagian = [`Bab ${bab.urutanBab}`, tanggal, `dipakai ${jumlahKuis(bab)} kuis`]
+  const pembuat = daftarPembuat(bab)
+  if (pembuat.length) bagian.push(`oleh ${pembuat.join(', ')}`)
+  return bagian.join(' · ')
 }
 
 function tanganiError(err) {
@@ -67,8 +90,19 @@ async function muatBab() {
     // GET /bab tidak menyertakan jumlah kuis, jadi dihitung dari daftar kuis.
     const [bab, kuis] = await Promise.all([ambilDaftarBab(), ambilDaftarKuis()])
     const jumlah = new Map()
-    for (const k of kuis) jumlah.set(k.idBab, (jumlah.get(k.idBab) ?? 0) + 1)
+    const pembuat = new Map()
+    const nama = new Map()
+    for (const k of kuis) {
+      jumlah.set(k.idBab, (jumlah.get(k.idBab) ?? 0) + 1)
+      if (k.idUser && k.namaPembuat) nama.set(k.idUser, k.namaPembuat)
+      const oleh = k.idUser && k.idUser === idSaya ? 'Anda' : k.namaPembuat
+      if (!oleh) continue
+      if (!pembuat.has(k.idBab)) pembuat.set(k.idBab, new Set())
+      pembuat.get(k.idBab).add(oleh)
+    }
     jumlahKuisPerBab.value = jumlah
+    pembuatKuisPerBab.value = pembuat
+    namaDosen.value = nama
     daftarBab.value = bab
   } catch (err) {
     tanganiError(err)
@@ -107,7 +141,7 @@ async function handleHapus(bab) {
       <div class="flex flex-col gap-2">
         <h1 class="text-[28px] leading-9 font-semibold">Kelola Bab</h1>
         <p class="text-[17px] lg:text-[19px] leading-[26px] text-wf-secondary">
-          Tambah, ubah, dan hapus bab. Klik nama bab untuk mengelola kuis dan soal di dalamnya.
+          Tambah, ubah, dan hapus bab. Klik kartu bab untuk mengelola kuis dan soal di dalamnya.
         </p>
       </div>
 
@@ -182,21 +216,26 @@ async function handleHapus(bab) {
         <article
           v-for="bab in daftarYangTampil"
           :key="bab.idBab"
-          class="bg-wf-card border border-wf-border-subtle rounded-md px-6 py-5 flex flex-wrap items-center gap-x-6 gap-y-3"
+          class="group relative bg-wf-card border border-wf-border-subtle rounded-md px-6 py-5 flex flex-wrap items-center gap-x-6 gap-y-3 transition hover:border-wf-brand-border hover:shadow-sm"
         >
           <div class="flex-1 min-w-[240px] flex flex-col gap-2">
             <h3 class="text-[19px] leading-[26px] font-semibold">
-              <RouterLink :to="`/bab/${bab.idBab}/kuis`" class="text-wf-brand hover:underline">
+              <!-- after:inset-0 merentangkan tautan ini ke seluruh kartu, jadi kartu di mana pun bisa diklik -->
+              <RouterLink
+                :to="`/bab/${bab.idBab}/kuis`"
+                class="text-wf-brand group-hover:underline focus:outline-none after:absolute after:inset-0 after:rounded-md after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-wf-brand"
+              >
                 {{ bab.namaBab }}
               </RouterLink>
             </h3>
             <p v-if="bab.deskripsi" class="text-[15px] leading-6 text-wf-secondary">{{ bab.deskripsi }}</p>
-            <p class="font-mono text-[14px] lg:text-[15px] leading-5 tracking-[1px] text-wf-muted">
+            <p class="font-mono text-[14px] leading-5 font-bold tracking-[1px] text-wf-secondary">
               {{ keteranganBab(bab) }}
             </p>
           </div>
 
-          <div class="flex flex-wrap items-center gap-3">
+          <!-- relative z-10: tombol tetap di atas tautan kartu -->
+          <div class="relative z-10 flex flex-wrap items-center gap-3">
             <span
               v-if="bab.status"
               class="px-2 py-1 rounded-md border text-[17px] font-semibold tracking-[0.5px]"

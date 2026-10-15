@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminHeader from '../components/AdminHeader.vue'
+import TombolKembali from '../components/TombolKembali.vue'
 import { takeNotice, SessionExpiredError } from '../services/auth'
 import { ambilBab } from '../services/bab'
 import { ambilDaftarKuis, hapusKuis, ubahKuis } from '../services/kuis'
@@ -166,8 +167,9 @@ async function generatePasswordBaru() {
 
     <main class="px-4 sm:px-10 lg:px-20 py-10 flex flex-col gap-6">
       <div class="flex flex-col gap-2">
-        <p class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary uppercase">
-          <RouterLink to="/bab" class="hover:underline normal-case">← Bab</RouterLink>
+        <TombolKembali to="/bab" class="mb-2" />
+        <p class="font-mono text-[18px] leading-7 tracking-[1px] text-wf-text uppercase">
+          <RouterLink to="/bab" class="hover:underline normal-case">Bab</RouterLink>
           <template v-if="bab"> / {{ bab.namaBab }}</template> / KELOLA KUIS
         </p>
         <h1 class="text-[28px] leading-9 font-semibold">Kelola Kuis</h1>

@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import AdminHeader from './AdminHeader.vue'
+import TombolKembali from './TombolKembali.vue'
 import lockIcon from '../assets/icons/lock.svg'
 
 // Pengganti halaman Edit Kuis / Edit Soal kalau kuis dibuat dosen lain
@@ -33,8 +34,9 @@ const rincian = computed(() => [
 
     <main class="px-4 sm:px-10 lg:px-20 pt-10 pb-14 flex flex-col gap-6">
       <div class="flex flex-col gap-2">
-        <p class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">
-          <RouterLink to="/bab" class="hover:underline">← Bab</RouterLink>
+        <TombolKembali :to="tautanKembali" class="mb-2" />
+        <p class="font-mono text-[18px] leading-7 tracking-[1px] text-wf-text">
+          <RouterLink to="/bab" class="hover:underline">Bab</RouterLink>
           <template v-if="namaBab">
             / <RouterLink :to="tautanKembali" class="hover:underline uppercase">{{ namaBab }}</RouterLink>
           </template>

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminHeader from '../components/AdminHeader.vue'
+import TombolKembali from '../components/TombolKembali.vue'
 import { setNotice, SessionExpiredError } from '../services/auth'
 import { ambilBab, ambilDaftarBab, buatBab, ubahBab } from '../services/bab'
 import pencilIcon from '../assets/icons/pencil.svg'
@@ -78,8 +79,9 @@ async function simpan() {
 
     <main class="px-4 sm:px-10 lg:px-20 pt-10 pb-14 flex flex-col gap-6">
       <div class="flex flex-col gap-2">
-        <p class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">
-          <RouterLink to="/bab" class="hover:underline">← Bab</RouterLink>
+        <TombolKembali to="/bab" class="mb-2" />
+        <p class="font-mono text-[18px] leading-7 tracking-[1px] text-wf-text">
+          <RouterLink to="/bab" class="hover:underline">Bab</RouterLink>
           / {{ modeEdit ? 'EDIT BAB' : 'TAMBAH BAB' }}
         </p>
         <h1 class="text-[28px] leading-9 font-semibold">{{ modeEdit ? 'Edit Bab' : 'Tambah Bab' }}</h1>

@@ -3,15 +3,24 @@ import {
   getOutputMembership,
 } from './membership.js';
 
-/**
- * Threshold pemetaan skor crisp ke klasifikasi tingkat penguasaan linguistik
- */
+export const MIN_CENTROID = 13.96;
+export const MAX_CENTROID = 86.04;
+
 export const SCORE_THRESHOLDS = Object.freeze({
   SANGAT_RENDAH_MAX: 35, // Score < 35
-  RENDAH_MAX: 55,        // 35 <= Score < 55
-  SEDANG_MAX: 75,        // 55 <= Score < 75
-  // Score >= 75 -> 'Tinggi'
+  RENDAH_MAX: 60,        // 35 <= Score < 60
+  SEDANG_MAX: 80,        // 60 <= Score < 80
+  // Score >= 80 -> 'Tinggi'
 });
+
+export function normalizeCentroid(rawScore) {
+  const raw = Number(rawScore);
+  if (!Number.isFinite(raw)) return 0.0;
+  const roundedRaw = Number(raw.toFixed(2));
+  const clampedRaw = Math.min(MAX_CENTROID, Math.max(MIN_CENTROID, roundedRaw));
+  const normalized = ((clampedRaw - MIN_CENTROID) / (MAX_CENTROID - MIN_CENTROID)) * 100;
+  return Number(Math.min(100, Math.max(0, normalized)).toFixed(2));
+}
 
 /**
  * Defuzzifikasi menggunakan metode Centroid / Center of Gravity (CoG)

@@ -19,6 +19,9 @@ import {
 
 import {
   SCORE_THRESHOLDS,
+  MIN_CENTROID,
+  MAX_CENTROID,
+  normalizeCentroid,
   defuzzifyCentroid,
   mapScoreToLevel,
 } from './fuzzy/defuzzifier.js';
@@ -76,11 +79,13 @@ export function evaluateItem({
 
   const isCorrectBool = fuzzCorrectness[CORRECTNESS_SETS.BENAR] === 1.0;
   const rawScore = defuzzifyCentroid(firingWeights, stepSize, isCorrectBool);
-  const crispScore = Number(rawScore.toFixed(2));
+  const rawCentroidScore = Number(rawScore.toFixed(2));
+  const crispScore = normalizeCentroid(rawScore);
   const linguisticLevel = mapScoreToLevel(crispScore);
 
   return {
     crispScore,
+    rawCentroidScore,
     linguisticLevel,
     firingWeights: {
       [LINGUISTIC_LEVELS.SANGAT_RENDAH]: Number((firingWeights[LINGUISTIC_LEVELS.SANGAT_RENDAH] || 0).toFixed(4)),
@@ -112,6 +117,7 @@ export function evaluateQuiz(answersArray, totalDurationSeconds = null, options 
   if (!Array.isArray(answersArray) || answersArray.length === 0) {
     return {
       skorFuzzy: 0.0,
+      rawSkorFuzzy: 0.0,
       kategoriFuzzy: LINGUISTIC_LEVELS.SANGAT_RENDAH,
       totalSoal: 0,
       totalBenar: 0,
@@ -137,6 +143,7 @@ export function evaluateQuiz(answersArray, totalDurationSeconds = null, options 
 
   const stepSize = options.stepSize || 0.5;
   let totalScoreSum = 0;
+  let rawScoreSum = 0;
   let totalBenarCount = 0;
   let accumulatedItemTime = 0;
 
@@ -175,6 +182,7 @@ export function evaluateQuiz(answersArray, totalDurationSeconds = null, options 
     });
 
     totalScoreSum += evaluated.crispScore;
+    rawScoreSum += evaluated.rawCentroidScore;
     if (evaluated.meta.isCorrect) {
       totalBenarCount += 1;
     }
@@ -199,6 +207,7 @@ export function evaluateQuiz(answersArray, totalDurationSeconds = null, options 
   const totalSalahCount = totalSoal - totalBenarCount;
   const akurasi = Number(((totalBenarCount / totalSoal) * 100).toFixed(2));
   const avgCrispScore = Number((totalScoreSum / totalSoal).toFixed(2));
+  const avgRawScore = Number((rawScoreSum / totalSoal).toFixed(2));
   const rataRataWaktu = Number((accumulatedItemTime / totalSoal).toFixed(2));
   const totalWaktuPengerjaan = totalDurationSeconds !== null && Number.isFinite(Number(totalDurationSeconds))
     ? Number(totalDurationSeconds)
@@ -227,6 +236,7 @@ export function evaluateQuiz(answersArray, totalDurationSeconds = null, options 
 
   return {
     skorFuzzy: avgCrispScore,
+    rawSkorFuzzy: avgRawScore,
     kategoriFuzzy,
     totalSoal,
     totalBenar: totalBenarCount,
@@ -256,6 +266,9 @@ export {
   RULES,
   evaluateRules,
   SCORE_THRESHOLDS,
+  MIN_CENTROID,
+  MAX_CENTROID,
+  normalizeCentroid,
   defuzzifyCentroid,
   mapScoreToLevel,
 };
@@ -272,6 +285,7 @@ export default {
   RULES,
   evaluateRules,
   defuzzifyCentroid,
+  normalizeCentroid,
   mapScoreToLevel,
   LINGUISTIC_LEVELS,
   DIFFICULTY_LEVELS,
@@ -279,4 +293,6 @@ export default {
   CORRECTNESS_SETS,
   OUTPUT_MEMBERSHIP_CONFIG,
   SCORE_THRESHOLDS,
+  MIN_CENTROID,
+  MAX_CENTROID,
 };
