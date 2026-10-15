@@ -73,16 +73,16 @@ export function hurufOpsi(index) {
 }
 
 function keEditor(soal) {
-  const opsi = soal.opsi ?? []
+  const opsi = Array.isArray(soal?.opsi) ? soal.opsi : []
   const kunci = opsi.findIndex((o) => o.isCorrect)
   return {
-    pertanyaan: soal.pertanyaan ?? '',
-    opsi: opsi.map((o) => (o.opsi ?? '').replace(LABEL_OPSI, '')),
+    pertanyaan: typeof soal?.pertanyaan === 'string' ? soal.pertanyaan : '',
+    opsi: opsi.map((o) => (typeof o?.opsi === 'string' ? o.opsi : '').replace(LABEL_OPSI, '')),
     kunci: kunci === -1 ? null : kunci,
-    difficulty: soal.difficulty ?? 'Sedang',
-    targetTime: soal.targetTime ?? 60,
-    pembahasan: soal.pembahasan ?? '',
-    ringkasan: soal.ringkasan ?? '',
+    difficulty: soal?.difficulty ?? 'Sedang',
+    targetTime: soal?.targetTime ?? 60,
+    pembahasan: typeof soal?.pembahasan === 'string' ? soal.pembahasan : '',
+    ringkasan: typeof soal?.ringkasan === 'string' ? soal.ringkasan : '',
   }
 }
 
@@ -163,7 +163,7 @@ export async function importSoalPdf({ file, idKuis, startPage, endPage, upload =
   formData.append('endPage', String(endPage))
   formData.append('upload', String(upload))
 
-  const res = await fetch(`${import.meta.env.VITE_API_URL ?? 'http://localhost:3000'}/api/soal/import-pdf`, {
+  const res = await fetch(`${import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'}/soal/import-pdf`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     body: formData, // jangan set Content-Type manual

@@ -55,6 +55,9 @@ function keteranganKuis(kuis) {
   const bagian = [`Dibuat ${formatTanggal(kuis.tanggalDibuat)}`]
   if (kuis.namaPembuat) bagian.push(`oleh ${kuis.bisaAturAkses ? 'Anda' : kuis.namaPembuat}`)
   if (kuis.jumlahSoal != null) bagian.push(`${kuis.jumlahSoal} soal`)
+  if (kuis.jumlahSoalTampil != null && kuis.jumlahSoalTampil < kuis.jumlahSoal) {
+    bagian.push(`${kuis.jumlahSoalTampil} ditampilkan acak`)
+  }
   if (kuis.durasi) bagian.push(`${kuis.durasi} menit`)
   if (kuis.deskripsi) bagian.push(kuis.deskripsi)
   return bagian.join(' · ')
@@ -90,7 +93,7 @@ onBeforeUnmount(() => {
 })
 
 async function handleHapus(kuis) {
-  if (!window.confirm(`Hapus kuis "${kuis.judul}"? Tindakan ini tidak bisa dibatalkan.`)) return
+  if (!window.confirm(`Hapus kuis "${kuis.judul}" beserta seluruh soal dan riwayat pengerjaannya? Tindakan ini tidak bisa dibatalkan.`)) return
 
   errorMsg.value = ''
   infoMsg.value = ''

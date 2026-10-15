@@ -4,10 +4,12 @@ import { successResponse, errorResponse } from '../models/apiResponse.js';
 import { ROLE } from '../config/roles.js';
 import { bisaDikelola, bisaAturAkses, KOLOM_AKSES_KUIS } from '../utils/aksesKuis.js';
 import { buatPasswordKuis } from '../utils/passwordKuis.js';
+import { siapkanPengaturanAcak, jumlahSoalDikerjakan } from '../utils/acakSoal.js';
 
 // pembuat:User(nama) = nama dosen pembuat lewat FK Kuis.idUser, supaya daftar kuis
 // dalam satu bab bisa dibedakan ("Kuis 1 - Dosen A", "Kuis 1 - Dosen B").
-const KUIS_COLUMNS = 'idKuis, idUser, idBab, judul, deskripsi, durasi, tanggalDibuat, pin, aksesKelola, dosenPengelola, pembuat:User(nama)';
+const KUIS_COLUMNS =
+  'idKuis, idUser, idBab, judul, deskripsi, durasi, acakSoal, jumlahTampil, tanggalDibuat, pin, aksesKelola, dosenPengelola, pembuat:User(nama)';
 
 // Password kuis dibuat otomatis oleh server saat kuis dibuat (lihat utils/passwordKuis.js):
 // tepat 8 karakter ASCII yang bisa dicetak (huruf besar/kecil, angka, simbol), tanpa spasi.
@@ -72,10 +74,13 @@ export const getAllKuis = async (req, res) => {
 
     const daftar = data.map(({ Soal, ...kuis }) => {
       const hasilTerakhir = riwayatPerKuis.get(kuis.idKuis);
-      const tersedia = kuis.pin !== null && (Soal[0]?.count ?? 0) > 0;
+      const jumlahSoal = Soal[0]?.count ?? 0;
+      const tersedia = kuis.pin !== null && jumlahSoal > 0;
       return {
         ...keRespons(kuis, req.currentUser),
-        jumlahSoal: Soal[0]?.count ?? 0,
+        jumlahSoal,
+        // Jumlah soal yang dikerjakan mahasiswa per percobaan (bisa lebih sedikit kalau acak soal aktif).
+        jumlahSoalTampil: jumlahSoalDikerjakan(kuis, jumlahSoal),
         tersedia,
         nilaiTerakhir: hasilTerakhir?.skorFuzzy ?? null,
         kategoriTerakhir: hasilTerakhir?.kategoriFuzzy ?? null,
@@ -123,6 +128,9 @@ export const createKuis = async (req, res) => {
       return res.status(400).json(errorResponse({ message: 'idBab dan judul wajib diisi.' }));
     }
 
+    const acak = siapkanPengaturanAcak(req.body);
+    if (acak.error) return res.status(400).json(errorResponse({ message: acak.error }));
+
     // durasi opsional: kalau tidak dikirim database memakai default kolomnya (30 menit).
     const payload = {
       idUser: req.currentUser.id,
@@ -130,6 +138,7 @@ export const createKuis = async (req, res) => {
       judul: judul.trim(),
       deskripsi: deskripsi ?? null,
       pin: buatPasswordKuis(),
+      ...acak.data,
     };
     if (durasi !== undefined && durasi !== null) {
       const durasiInt = Number(durasi);
@@ -164,10 +173,11 @@ export const updateKuis = async (req, res) => {
   try {
     const { id } = req.params;
     // generatePin: true = buat password baru (dipakai tombol "Generate" di pop-up password).
-    const { idBab, judul, deskripsi, durasi, pin, generatePin } = req.body;
+    const { idBab, judul, deskripsi, durasi, pin, generatePin, acakSoal, jumlahTampil } = req.body;
 
     if (idBab === undefined && judul === undefined && deskripsi === undefined
-      && durasi === undefined && pin === undefined && generatePin === undefined) {
+      && durasi === undefined && pin === undefined && generatePin === undefined
+      && acakSoal === undefined && jumlahTampil === undefined) {
       return res.status(400).json(errorResponse({ message: 'Tidak ada data yang diubah.' }));
     }
 
@@ -187,7 +197,10 @@ export const updateKuis = async (req, res) => {
       );
     }
 
-    const updatePayload = {};
+    const acak = siapkanPengaturanAcak(req.body);
+    if (acak.error) return res.status(400).json(errorResponse({ message: acak.error }));
+
+    const updatePayload = { ...acak.data };
     if (judul !== undefined) {
       if (!judul.trim()) {
         return res.status(400).json(errorResponse({ message: 'Judul tidak boleh kosong.' }));
@@ -255,7 +268,32 @@ export const deleteKuis = async (req, res) => {
       );
     }
 
+    // FK Soal.idKuis memakai ON DELETE SET NULL, jadi soal tidak ikut terhapus otomatis.
+    // Catat dulu idSoal-nya, karena setelah kuis dihapus idKuis di soal sudah menjadi NULL.
+    const { data: daftarSoal, error: soalError } = await supabaseAdmin
+      .from('Soal')
+      .select('idSoal')
+      .eq('idKuis', id);
+
+    if (soalError) {
+      return res.status(500).json(errorResponse({ message: soalError.message || 'Gagal membaca soal kuis.' }));
+    }
+
     const { error } = await supabaseAdmin.from('Kuis').delete().eq('idKuis', id);
+
+    if (!error && daftarSoal.length) {
+      // OpsiJawaban dan JawabanMahasiswa ikut terhapus lewat ON DELETE CASCADE.
+      const { error: hapusSoalError } = await supabaseAdmin
+        .from('Soal')
+        .delete()
+        .in('idSoal', daftarSoal.map((s) => s.idSoal));
+
+      if (hapusSoalError) {
+        return res.status(500).json(
+          errorResponse({ message: `Kuis terhapus, tetapi soalnya gagal dihapus: ${hapusSoalError.message}` }),
+        );
+      }
+    }
 
     if (error) {
       // 23503 = foreign key violation — masih dipakai pengerjaan_kuis

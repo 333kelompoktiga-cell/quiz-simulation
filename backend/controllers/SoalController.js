@@ -30,7 +30,7 @@ const teksAtauNull = (nilai) => {
 // Memeriksa satu soal dari body dan mengubahnya ke bentuk kolom database.
 // Mengembalikan { error } atau { data }. `wajibSemua` = false untuk PUT /api/soal/:id,
 // di mana field yang tidak dikirim tidak ikut diubah.
-const siapkanSoal = (body, { wajibSemua }) => {
+export const siapkanSoal = (body, { wajibSemua }) => {
   const data = {};
   const ada = (field) => wajibSemua || body[field] !== undefined;
 
@@ -92,7 +92,7 @@ const urutkanSoal = (query) =>
 
 // Soal tidak punya pemilik sendiri — pemiliknya adalah pembuat kuisnya.
 // Mengembalikan { status, message } kalau ditolak, atau null kalau admin ini boleh mengurusnya.
-const cekAksesKuis = async (idKuis, currentUserId) => {
+export const cekAksesKuis = async (idKuis, currentUserId) => {
   // Soal tanpa kuis = bank soal, boleh diurus admin mana pun.
   if (idKuis === null) return null;
 

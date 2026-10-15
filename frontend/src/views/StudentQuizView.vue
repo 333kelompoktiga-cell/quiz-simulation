@@ -7,7 +7,6 @@ import {
   submitPengerjaanKuis,
 } from '../services/kuis'
 import { SessionExpiredError } from '../services/auth'
-import MathText from '../components/MathText.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
 const router = useRouter()
@@ -260,7 +259,7 @@ onBeforeUnmount(() => window.clearInterval(timerId))
               <span class="rounded-md border border-wf-brand-border px-2 py-1 text-sm text-wf-secondary">Tingkat: {{ soalAktif.difficulty || 'Mudah' }}</span>
             </div>
           </div>
-          <h2 class="mt-6 text-[18px] font-bold leading-6"><MathText :teks="soalAktif.pertanyaan" /></h2>
+          <h2 class="mt-6 text-[18px] font-bold leading-6"><span class="whitespace-pre-line">{{ soalAktif.pertanyaan }}</span></h2>
           <p class="mt-5 font-mono text-[15px] text-wf-secondary">Pilih salah satu:</p>
           <div class="mt-5 flex flex-col gap-3">
             <label
@@ -271,7 +270,7 @@ onBeforeUnmount(() => window.clearInterval(timerId))
             >
               <input v-model="jawaban[nomorAktif]" type="radio" :value="indexOpsi" :disabled="submitting" class="size-5 accent-wf-brand" @change="pilihJawaban(indexOpsi)" />
               <span class="font-semibold">{{ String.fromCharCode(65 + indexOpsi) }}</span>
-              <span><MathText :teks="formatOpsi(opsi.opsi)" /></span>
+              <span class="whitespace-pre-line">{{ formatOpsi(opsi.opsi) }}</span>
             </label>
           </div>
           <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-wf-border-subtle pt-5">
