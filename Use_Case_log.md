@@ -33,6 +33,8 @@ Admin:
 11. Mengedit Soal
 12. Menghapus Soal
 13. Mengatur PIN Kuis
+14. Hak Akses Kuis
+15. Ganrate password otomatis
 
 Yang Belum Kelar (backend):
 Pengguna:
@@ -44,5 +46,4 @@ edit Akun
 3. Melihat Report Mahasiswa
 
 Yang harus dibaikin after asist ke ibunya:
-1. Hak Akses kuis untuk akun dosen
 2. Random urutan soal yang sudah dibuat
