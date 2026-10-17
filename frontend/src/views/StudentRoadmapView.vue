@@ -59,7 +59,7 @@ onMounted(() => {
   <div class="min-h-screen bg-wf-page text-wf-text">
     <StudentHeader active="peta" />
 
-    <main class="mx-auto max-w-[1000px] px-6 pb-12 pt-8 sm:px-10 lg:px-0">
+    <main class="mx-auto max-w-[900px] px-6 pb-16 pt-8 sm:px-10 lg:px-0">
       <!-- Breadcrumb -->
       <nav aria-label="Breadcrumb" class="font-mono text-[14px] uppercase tracking-wider text-wf-secondary sm:text-[15px]">
         <RouterLink to="/peta-belajar" class="font-semibold text-wf-brand hover:underline">← Peta Belajar</RouterLink>
@@ -71,8 +71,8 @@ onMounted(() => {
       <div class="mt-4 flex flex-wrap items-start justify-between gap-4 border-b border-wf-border-subtle pb-5">
         <div>
           <h1 class="text-[24px] font-bold sm:text-[28px] text-wf-text">Roadmap Bab: {{ namaBab }}</h1>
-          <p class="mt-1 text-[15px] text-wf-secondary leading-relaxed">
-            Dihimpun dari seluruh pengerjaan kuis pada bab ini. AI menganalisis kelemahan soal dan menyusun tahapan penguatan materi.
+          <p class="mt-1 text-[14px] text-wf-secondary leading-relaxed">
+            Dihimpun dari butir-butir soal yang belum tepat dari seluruh kuis di bab ini untuk menyusun tahapan penguatan konsep secara terukur.
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-2.5">
@@ -99,15 +99,15 @@ onMounted(() => {
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <span class="text-xs font-semibold uppercase tracking-wider text-wf-secondary">Diagnosis AI untuk Bab Ini</span>
-            <p class="mt-1 text-[15px] font-medium text-wf-text">{{ roadmapData.ringkasanBab }}</p>
+            <p class="mt-1 text-[14px] font-medium text-wf-text leading-relaxed">{{ roadmapData.ringkasanBab }}</p>
           </div>
-          <div class="flex flex-wrap gap-4 text-xs">
+          <div class="flex flex-wrap gap-3 text-xs">
             <div class="rounded-lg bg-wf-page px-3 py-2 border border-wf-border-subtle">
               <span class="text-wf-secondary">Kuis Selesai: </span>
               <strong class="text-wf-text">{{ roadmapData.totalKuisSelesai }} / {{ roadmapData.totalKuisBab }}</strong>
             </div>
             <div class="rounded-lg bg-wf-page px-3 py-2 border border-wf-border-subtle">
-              <span class="text-wf-secondary">Soal Perlu Diperkuat: </span>
+              <span class="text-wf-secondary">Soal Belum Tepat: </span>
               <strong :class="roadmapData.totalSoalSalah > 0 ? 'text-amber-600' : 'text-emerald-600'">
                 {{ roadmapData.totalSoalSalah }} butir
               </strong>
@@ -127,14 +127,14 @@ onMounted(() => {
       <!-- Loading State -->
       <div v-if="loading" class="mt-12 flex flex-col items-center justify-center py-12 text-center">
         <div class="size-10 animate-spin rounded-full border-4 border-wf-brand border-t-transparent"></div>
-        <p class="mt-4 text-[15px] font-medium text-wf-text">Menyusun Peta Belajar dengan AI...</p>
-        <p class="mt-1 text-xs text-wf-secondary">Membaca butir soal salah dan menyusun materi perbaikan khusus untuk Anda.</p>
+        <p class="mt-4 text-[15px] font-medium text-wf-text">Menyusun Peta Belajar...</p>
+        <p class="mt-1 text-xs text-wf-secondary">Menganalisis butir soal salah dari seluruh kuis dan merancang tahapan belajar terukur.</p>
       </div>
 
       <!-- State: Belum Dikerjakan -->
       <div v-else-if="status === 'belum_dikerjakan'" class="mt-8 rounded-xl border border-dashed border-wf-border p-8 text-center bg-wf-card">
         <p class="text-base font-semibold text-wf-text">Belum ada kuis yang diselesaikan pada bab ini.</p>
-        <p class="mt-1 text-sm text-wf-secondary">Kerjakan minimal satu kuis untuk memicu AI menyusun roadmap belajar personal Anda.</p>
+        <p class="mt-1 text-sm text-wf-secondary">Kerjakan minimal satu kuis untuk memicu penyusunan roadmap belajar personal Anda.</p>
         <RouterLink
           :to="`/latihan/${props.id}`"
           class="mt-4 inline-block rounded-xl bg-wf-brand px-5 py-2.5 text-sm font-semibold text-white hover:bg-wf-accent-hover"
@@ -156,62 +156,85 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- Daftar Tahapan Belajar dari AI -->
-      <section v-if="tahapan.length && !loading" class="mt-6 flex flex-col gap-5">
+      <!-- Daftar Tahapan Belajar Pedagogis -->
+      <section v-if="tahapan.length && !loading" class="mt-6 flex flex-col gap-6">
         <article
           v-for="(item, index) in tahapan"
           :key="item.judul || index"
-          class="grid gap-4 rounded-xl border border-wf-border-subtle bg-wf-card p-6 shadow-sm transition sm:grid-cols-[48px_minmax(0,1fr)] sm:items-start"
+          class="rounded-xl border border-wf-border-subtle bg-wf-card p-6 shadow-sm transition hover:border-wf-brand/40"
         >
-          <!-- Badge Tahap Ke -->
-          <div class="flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-wf-brand bg-wf-brand-soft text-[16px] font-bold text-wf-brand">
-            {{ index + 1 }}
+          <!-- Judul Tahap -->
+          <div class="border-b border-wf-border-subtle pb-3">
+            <h2 class="text-[18px] sm:text-[20px] font-bold text-wf-text">
+              Tahap {{ item.tahapKe || index + 1 }} — {{ item.judul }}
+            </h2>
+            <div class="mt-1.5 flex flex-wrap items-center gap-2">
+              <span
+                class="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold"
+                :class="item.prioritas && item.prioritas.includes('tinggi')
+                  ? 'bg-red-50 text-red-700 border border-red-200'
+                  : item.prioritas && item.prioritas.includes('akhir')
+                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200'"
+              >
+                {{ item.prioritas || 'Prioritas tinggi' }}
+              </span>
+              <span class="text-xs text-wf-secondary font-medium">·</span>
+              <span class="text-xs text-wf-secondary font-medium">{{ item.estimasiWaktu || '15 menit' }}</span>
+            </div>
           </div>
 
-          <!-- Rincian Tahap -->
-          <div class="space-y-3">
-            <div>
-              <span class="text-xs font-semibold uppercase tracking-wider text-wf-brand">Tahap {{ index + 1 }}</span>
-              <h2 class="text-[18px] font-bold text-wf-text">{{ item.judul }}</h2>
-            </div>
-
-            <!-- Ringkasan / Analisis Kesalahan -->
-            <div class="rounded-lg bg-amber-50/70 border border-amber-200/80 p-3.5 text-sm text-amber-900 leading-relaxed">
-              <strong class="font-semibold text-amber-950">Analisis Kesalahan: </strong>
-              {{ item.ringkasan }}
-            </div>
-
-            <!-- Tujuan Belajar -->
-            <p class="text-[14px] leading-relaxed text-wf-secondary">
-              <strong class="font-medium text-wf-text">Tujuan Belajar: </strong>
-              {{ item.tujuan }}
+          <!-- Rincian Pedagogis: Tujuan, Aktivitas, Kriteria Selesai -->
+          <div class="mt-4 space-y-3.5">
+            <!-- Tujuan -->
+            <p class="text-[14px] sm:text-[15px] leading-relaxed text-wf-text">
+              <strong class="font-semibold text-wf-text">Tujuan:</strong> {{ item.tujuan }}
             </p>
 
-            <!-- Rekomendasi Kegiatan -->
-            <p class="text-[14px] leading-relaxed text-wf-secondary">
-              <strong class="font-medium text-wf-text">Kegiatan yang Disarankan: </strong>
-              {{ item.kegiatan }}
-            </p>
+            <!-- Aktivitas Belajar & Latihan (Poin-Poin Bullets) -->
+            <div v-if="item.aktivitas && item.aktivitas.length" class="pt-1">
+              <span class="text-xs font-semibold uppercase tracking-wider text-wf-secondary">Aktivitas Belajar & Latihan:</span>
+              <ul class="mt-1.5 space-y-1.5 text-[14px] text-wf-text pl-1">
+                <li v-for="(act, aIdx) in item.aktivitas" :key="aIdx" class="flex items-start gap-2.5">
+                  <span class="text-wf-brand font-bold select-none leading-none pt-1">•</span>
+                  <span class="leading-relaxed">{{ act }}</span>
+                </li>
+              </ul>
+            </div>
+            <div v-else-if="item.kegiatan" class="pt-1">
+              <span class="text-xs font-semibold uppercase tracking-wider text-wf-secondary">Aktivitas Belajar & Latihan:</span>
+              <p class="mt-1 text-[14px] text-wf-text leading-relaxed">• {{ item.kegiatan }}</p>
+            </div>
 
-            <!-- Soal Terkait yang Diidentifikasi AI -->
-            <div v-if="item.soalTerkait && item.soalTerkait.length" class="pt-1">
-              <span class="text-xs font-medium text-wf-secondary">Butir Soal Terkait:</span>
-              <div class="mt-1 flex flex-wrap gap-2">
-                <span
-                  v-for="(soal, sIdx) in item.soalTerkait"
-                  :key="sIdx"
-                  class="rounded-md bg-wf-page px-2.5 py-1 text-xs text-wf-secondary border border-wf-border-subtle font-mono"
-                >
-                  {{ soal }}
-                </span>
+            <!-- Kriteria Selesai / Target Terukur -->
+            <div class="pt-2">
+              <div class="inline-flex items-center gap-2 rounded-lg bg-emerald-50/90 border border-emerald-200 px-3.5 py-1.5 text-[13px] font-medium text-emerald-800">
+                <span class="font-semibold text-emerald-950">Kriteria selesai:</span>
+                <span>{{ item.kriteriaSelesai || 'minimal 2 dari 3 soal benar.' }}</span>
               </div>
             </div>
+
+            <!-- Butir Soal Terkait dari Kuis Sebelumnya (Collapsible) -->
+            <details v-if="item.soalTerkait && item.soalTerkait.length" class="mt-4 pt-3 text-xs border-t border-wf-border-subtle group">
+              <summary class="cursor-pointer font-medium text-wf-secondary hover:text-wf-brand select-none flex items-center gap-1.5">
+                <span>🔍 Tinjau butir soal terkait yang belum tepat ({{ item.soalTerkait.length }} butir)</span>
+              </summary>
+              <div class="mt-2.5 flex flex-col gap-1.5 pl-2 border-l-2 border-wf-border-subtle">
+                <div
+                  v-for="(soal, sIdx) in item.soalTerkait"
+                  :key="sIdx"
+                  class="rounded-md bg-wf-page p-2.5 text-xs text-wf-secondary font-mono leading-relaxed"
+                >
+                  {{ soal }}
+                </div>
+              </div>
+            </details>
           </div>
         </article>
       </section>
 
       <!-- Navigasi Bawah -->
-      <div class="mt-8 flex flex-wrap items-center justify-between gap-4">
+      <div class="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-wf-border-subtle pt-6">
         <RouterLink
           to="/peta-belajar"
           class="rounded-xl border border-wf-border-subtle bg-wf-card px-5 py-3 text-sm font-bold text-wf-secondary hover:border-wf-brand hover:text-wf-brand shadow-sm transition"
