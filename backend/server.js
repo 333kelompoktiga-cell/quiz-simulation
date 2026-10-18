@@ -8,6 +8,7 @@ import profileRoute from './routes/profilRoute.js';
 import pengerjaanRoute from './routes/pengerjaanRoute.js';
 import soalImportRoute from './routes/soalImportRoute.js';
 import roadmapRoute from './routes/roadmapRoute.js';
+import rekapRoute from './routes/rekapRoute.js';
 
 import 'dotenv/config';
 import express from 'express';
@@ -60,6 +61,7 @@ app.use('/api/account', accountRoute);
 app.use('/api/profile', profileRoute);
 app.use('/api/pengerjaan', pengerjaanRoute);
 app.use('/api/peta-belajar', roadmapRoute);
+app.use('/api/rekap', rekapRoute);
 
 app.get('/health', async (_, res) => {
   try {

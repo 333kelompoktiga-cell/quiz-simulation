@@ -14,14 +14,14 @@ const loggingOut = ref(false)
 
 // Super Admin hanya mengelola akun; endpoint Kuis/Bab menolak role itu.
 // Navbar admin sesuai wireframe: Kuis dan Rekap. "Kuis" membuka Kelola Bab
-// dan tetap aktif di seluruh alur bab → kuis → soal.
-// Rekap belum punya halaman, jadi tampil sebagai teks saja.
+// dan tetap aktif di seluruh alur bab → kuis → soal. "Report Nilai" membuka
+// rekap skor fuzzy (/rekap) dan tetap aktif sampai detail pengerjaan.
 const superAdmin = user?.role === ROLE.SUPER_ADMIN
 const menu = superAdmin
   ? [{ label: 'Akun', to: '/akun', aktifDi: ['/akun'] }]
   : [
       { label: 'Kuis', to: '/bab', aktifDi: ['/bab', '/kuis'] },
-      { label: 'Rekap' },
+      { label: 'Report Nilai', to: '/rekap', aktifDi: ['/rekap'] },
     ]
 
 function aktif(item) {

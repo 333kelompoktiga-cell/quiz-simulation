@@ -68,7 +68,7 @@ Keterangan Status FE:
 
 | No | Use Case | Status FE | Halaman | Dikerjakan | Catatan |
 |---|---|---|---|---|---|
-| 1 | Melihat Report Mahasiswa: rekap nilai mahasiswa yang mengerjakan kuisnya | Belum | - | - | Menu Rekap di header admin masih teks (wireframe HA5 Rekap nilai) |
+| 1 | Melihat Report Mahasiswa: rekap nilai mahasiswa yang mengerjakan kuisnya | Selesai | `/rekap`, `/rekap/kuis/:id`, `/rekap/pengerjaan/:id` (menu Report Nilai) | Ojan | Halaman sesuai wireframe HA6–HA8, memakai skor fuzzy. Endpoint `/api/rekap` baru dibuat (kontrak di `frontend/docs/KONTRAK_API_REKAP.md`), perlu dicek dengan data asli dan direview tim backend |
 
 ## Halaman pendukung
 
