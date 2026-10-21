@@ -78,31 +78,36 @@ export function catatanWaktuSoal(soal) {
   return ''
 }
 
-// CSV dengan pemisah titik koma dan BOM supaya langsung terbaca rapi di Excel
-// berbahasa Indonesia. Skor dibulatkan seperti yang tampil di layar.
-export function unduhCsvRekap(judulKuis, daftarMahasiswa) {
-  const sel = (v) => {
-    const s = String(v ?? '')
-    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-  }
-  const baris = [
-    ['Nama', 'NIM', 'Skor fuzzy', 'Kategori', 'Benar', 'Jumlah soal', 'Percobaan', 'Selesai'],
+// File Excel (.xlsx) rekap satu kuis. Library-nya dimuat saat tombol ditekan saja
+// supaya halaman lain tidak ikut berat. Skor dan jumlah disimpan sebagai angka
+// (bisa dihitung di Excel), NIM sebagai teks supaya angka 0 di depan tidak hilang.
+// Skor dibulatkan seperti yang tampil di layar.
+export async function unduhExcelRekap(judulKuis, daftarMahasiswa) {
+  const { default: writeExcelFile } = await import('write-excel-file/universal')
+  const angka = (v) => (v == null || v === '' ? null : Number(v))
+  const judulKolom = ['Nama', 'NIM', 'Skor fuzzy', 'Kategori', 'Benar', 'Jumlah soal', 'Percobaan', 'Selesai']
+  const data = [
+    judulKolom.map((value) => ({ value, fontWeight: 'bold' })),
     ...daftarMahasiswa.map((m) => [
-      m.nama,
-      m.nim,
-      formatSkor(m.skorFuzzy),
+      m.nama ?? '',
+      { value: String(m.nim ?? ''), type: String },
+      m.skorFuzzy == null ? null : Math.round(Number(m.skorFuzzy)),
       labelKategori(m.kategoriFuzzy),
-      m.totalBenar,
-      m.totalSoal,
-      m.jumlahPercobaan,
+      angka(m.totalBenar),
+      angka(m.totalSoal),
+      angka(m.jumlahPercobaan),
       formatTanggal(m.waktuSelesai, true),
     ]),
   ]
-  const isi = '﻿' + baris.map((b) => b.map(sel).join(';')).join('\r\n')
-  const url = URL.createObjectURL(new Blob([isi], { type: 'text/csv;charset=utf-8' }))
+  const blob = await writeExcelFile(data, {
+    sheet: 'Rekap',
+    columns: [{ width: 30 }, { width: 14 }, { width: 11 }, { width: 15 }, { width: 8 }, { width: 12 }, { width: 11 }, { width: 22 }],
+    stickyRowsCount: 1,
+  }).toBlob()
+  const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `rekap-${(judulKuis || 'kuis').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`
+  a.download = `rekap-${(judulKuis || 'kuis').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.xlsx`
   a.click()
   URL.revokeObjectURL(url)
 }
