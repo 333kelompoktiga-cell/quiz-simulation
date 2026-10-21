@@ -63,7 +63,7 @@ const daftarPembuat = computed(() => [
 
 function formatRingkasan() {
   const jumlah = daftarKuis.value.length
-  const soal = daftarKuis.value.reduce((sum, item) => sum + (item.jumlahSoal || 0), 0)
+  const soal = daftarKuis.value.reduce((sum, item) => sum + (item.jumlahSoalTampil ?? item.jumlahSoal ?? 0), 0)
   return `${jumlah} kuis · ${soal} soal · dibuka oleh ${daftarPembuat.value.join(', ') || 'Guru'}`
 }
 
@@ -137,7 +137,7 @@ onMounted(async () => {
                 <p v-if="item.namaPembuat" class="mt-1 text-[15px] font-semibold text-wf-brand">oleh {{ item.namaPembuat }}</p>
                 <p class="mt-1 text-[16px] text-wf-secondary">{{ item.deskripsi || 'Latihan pilihan ganda untuk menguji pemahaman materi.' }}</p>
                 <p class="mt-2 font-mono text-[13px] uppercase tracking-[0.1em] text-wf-muted">
-                  {{ item.jumlahSoal || 0 }} soal · bobot 100 poin · durasi {{ item.durasi ?? '—' }} menit
+                  {{ item.jumlahSoalTampil ?? item.jumlahSoal ?? 0 }} soal · bobot 100 poin · durasi {{ item.durasi ?? '—' }} menit
                 </p>
               </div>
               <div class="flex items-center gap-5">

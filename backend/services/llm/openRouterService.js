@@ -7,6 +7,7 @@ const DEFAULT_MODELS = [
   'liquid/lfm-2.5-2.6b:free',
   'nvidia/nemotron-3.5-lightning:free',
   'google/gemma-4-26b-a4b-it:free',
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
   'thinkingmachines/inkling:free',
   'poolside/laguna-s-2.1:free',
 ];
@@ -26,7 +27,6 @@ function parseJsonSafe(text) {
   try {
     return JSON.parse(cleaned);
   } catch {
-    // Coba temukan substring JSON { ... }
     const match = cleaned.match(/\{[\s\S]*\}/);
     if (match) {
       try {
@@ -40,102 +40,313 @@ function parseJsonSafe(text) {
 }
 
 /**
- * Fallback jika API OpenRouter sedang tidak bisa diakses
+ * Deteksi materi/topik pedagogis dari konten soal (pertanyaan, pembahasan, ringkasan, kunci)
  */
-function createFallbackRoadmap(namaBab, wrongQuestions) {
+function detectQuestionTopic(item, namaBab, deskripsiBab) {
+  const qText = (item.pertanyaan || '').toLowerCase();
+  const pembText = (item.pembahasan || '').toLowerCase();
+  const ringkText = (item.ringkasan || '').toLowerCase();
+  const kunciText = (item.kunciJawaban || '').toLowerCase();
+  const allText = `${qText} ${pembText} ${ringkText} ${kunciText}`.toLowerCase();
+  const descText = (deskripsiBab || '').toLowerCase();
+
+  // 1. Prioritas Utama: Deteksi Huruf Tebal
+  if (
+    /huruf tebal|cetak tebal/i.test(qText) ||
+    /huruf tebal/i.test(allText) ||
+    (/tebal/i.test(qText) && !/tebalnya buku|halaman tebal/i.test(qText))
+  ) {
+    return {
+      kategori: 'huruf_tebal',
+      judul: 'Penulisan dan Fungsi Huruf Tebal',
+      tujuan: 'Siswa memahami kaidah dan fungsi penulisan huruf tebal untuk menandai judul, bab, atau bagian penting dalam dokumen resmi.',
+      contoh: 'penulisan judul dokumen atau bagian khusus yang ditegaskan',
+      prioritas: 'Prioritas sedang',
+      waktu: '15 menit',
+    };
+  }
+
+  // 2. Huruf Kapital (nama orang, nama kota/geografi, hari, bulan, gelar, dsb)
+  if (
+    /nama orang|nama kota|nama hari|nama bulan|nama diri|geografi|huruf kapital|kapital|huruf besar|nama jalan|nama gelar/i.test(allText) ||
+    /kapital/i.test(descText)
+  ) {
+    return {
+      kategori: 'huruf_kapital',
+      judul: 'Kaidah Penulisan Huruf Kapital',
+      tujuan: 'Siswa mampu menerapkan penulisan huruf kapital pada nama orang, kota/geografi, hari, bulan, dan awal kalimat secara tepat.',
+      contoh: 'Andi tinggal di Balikpapan, hari Senin bulan Oktober',
+      prioritas: 'Prioritas tinggi',
+      waktu: '15 menit',
+    };
+  }
+
+  // 3. Kata Depan 'di' dan Imbuhan 'di-' (hanya jika memang menguji kaidah kata depan/imbuhan)
+  if (
+    /kata depan|penulisan kata depan|imbuhan di|imbuhan di-|kata berimbuhan di/i.test(qText) ||
+    /kata depan.*di|di antara.*kata depan/i.test(allText)
+  ) {
+    return {
+      kategori: 'kata_depan',
+      judul: 'Penulisan Kata Depan dan Imbuhan di-',
+      tujuan: 'Siswa mampu membedakan penulisan kata depan "di" yang dipisah dan imbuhan "di-" yang dirangkai.',
+      contoh: '"di antara" dan "di sekolah" vs "dibaca" dan "dikirim"',
+      prioritas: 'Prioritas tinggi',
+      waktu: '15 menit',
+    };
+  }
+
+  // 4. Kata Baku & Kosakata Serapan
+  if (/kata.*tidak baku|kata baku|kwalitas|ijin|analisa|resiko|apotik|antrian|fotocopy|sekedar|baku menurut kbbi/i.test(allText)) {
+    return {
+      kategori: 'kata_baku',
+      judul: 'Identifikasi Kata Baku Standar KBBI',
+      tujuan: 'Siswa mampu membedakan bentuk kata baku dan tidak baku dari kosakata serapan sesuai pedoman KBBI.',
+      contoh: 'kualitas, izin, analisis, aktivitas, dan risiko',
+      prioritas: 'Prioritas tinggi',
+      waktu: '15 menit',
+    };
+  }
+
+  // 5. Tanda Baca
+  if (/tanda baca|tanda koma|tanda titik|titik dua|tanda hubung|tanda petik/i.test(allText)) {
+    return {
+      kategori: 'tanda_baca',
+      judul: 'Penggunaan Tanda Baca dalam Kalimat',
+      tujuan: 'Siswa mampu menggunakan tanda baca secara tepat untuk memperjelas struktur dan hubungan antarklausa.',
+      contoh: 'penggunaan tanda koma pada perincian dan klausa bertingkat',
+      prioritas: 'Prioritas sedang',
+      waktu: '15 menit',
+    };
+  }
+
+  // 6. Kalimat Efektif
+  if (/kalimat efektif|kehematan|keparalelan|kelogisan|subjek ganda/i.test(allText)) {
+    return {
+      kategori: 'kalimat_efektif',
+      judul: 'Penyusunan Kalimat Efektif',
+      tujuan: 'Siswa mampu menyusun kalimat yang hemat, lugas, dan terstruktur secara logis.',
+      contoh: 'kesejajaran bentuk kata kerja dan kejelasan subjek',
+      prioritas: 'Prioritas sedang',
+      waktu: '20 menit',
+    };
+  }
+
+  // 7. Ide Pokok & Paragraf
+  if (/ide pokok|gagasan pokok|gagasan utama|simpulan|paragraf/i.test(allText)) {
+    return {
+      kategori: 'ide_pokok',
+      judul: 'Menemukan Ide Pokok dan Simpulan Paragraf',
+      tujuan: 'Siswa mampu menentukan gagasan pokok dan menarik simpulan isi bacaan secara tepat.',
+      contoh: 'penentuan kalimat utama pada pola paragraf deduktif dan induktif',
+      prioritas: 'Prioritas sedang',
+      waktu: '20 menit',
+    };
+  }
+
+  // 8. PLSV & Matematika
+  if (/ruas|persamaan|plsv|variabel|aljabar/i.test(allText)) {
+    return {
+      kategori: 'aljabar',
+      judul: 'Memahami Operasi Kedua Ruas dan Penyelesaian PLSV',
+      tujuan: 'Siswa memahami bahwa operasi yang dilakukan pada satu ruas harus menjaga kesetaraan persamaan.',
+      contoh: 'x + 5 = 12 dan penyelesaian bertahap',
+      prioritas: 'Prioritas tinggi',
+      waktu: '15 menit',
+    };
+  }
+
+  // 9. Operasi Bilangan Negatif
+  if (/bilangan negatif|negatif|bilangan bulat/i.test(allText)) {
+    return {
+      kategori: 'bilangan_negatif',
+      judul: 'Operasi Bilangan Bulat Negatif',
+      tujuan: 'Siswa mampu melakukan operasi penjumlahan dan pengurangan bilangan negatif secara tepat.',
+      contoh: 'x - (-3) = 8 dan aturan tanda positif/negatif',
+      prioritas: 'Prioritas tinggi',
+      waktu: '15 menit',
+    };
+  }
+
+  // 10. Fallback bersih: Jangan pernah menampilkan "123" atau nama kode pengujian
+  let labelBab = (deskripsiBab || namaBab || '').trim();
+  if (/^(tes|kuis|bab|testing)\s*\d*$/i.test(labelBab) || /^\d+$/.test(labelBab) || !labelBab) {
+    labelBab = deskripsiBab && !/^(tes|kuis|bab)\s*\d*$/i.test(deskripsiBab)
+      ? deskripsiBab
+      : 'Ejaan dan Tata Bahasa';
+  }
+
+  return {
+    kategori: 'umum',
+    judul: `Pemahaman Kaidah ${labelBab}`,
+    tujuan: `Siswa mampu memahami kaidah dan konsep dasar pada materi ${labelBab} secara menyeluruh.`,
+    contoh: `penerapan kaidah ${labelBab} pada soal kontekstual`,
+    prioritas: 'Prioritas tinggi',
+    waktu: '15 menit',
+  };
+}
+
+/**
+ * Fallback pedagogis cerdas jika kuota API OpenRouter habis atau jaringan terputus
+ */
+function createFallbackRoadmap(namaBab, wrongQuestions, deskripsiBab) {
   if (!wrongQuestions || wrongQuestions.length === 0) {
     return {
       ringkasanBab: `Selamat! Anda telah menguasai seluruh materi pada bab ${namaBab} dengan sangat baik.`,
       tahapan: [
         {
+          tahapKe: 1,
           judul: `Pengayaan Materi ${namaBab}`,
-          ringkasan: 'Seluruh soal pada kuis bab ini dijawab dengan benar.',
-          tujuan: `Memperdalam wawasan dan aplikasi lanjutan materi ${namaBab} dalam konteks penulisan akademik yang lebih kompleks.`,
-          kegiatan: 'Pelajari studi kasus penulisan tingkat lanjut dan pertahankan pemahaman kaidah yang sudah dikuasai.',
+          prioritas: 'Pengayaan',
+          estimasiWaktu: '15 menit',
+          tujuan: `Memperdalam wawasan dan aplikasi lanjutan materi ${namaBab} dalam konteks yang lebih kompleks.`,
+          aktivitas: [
+            `Pelajari studi kasus dan penerapan tingkat lanjut materi ${namaBab}.`,
+            'Tinjau kembali ringkasan materi untuk mempertahankan retensi pemahaman.',
+            'Coba latihan tantangan mandiri tingkat lanjut.',
+          ],
+          kriteriaSelesai: 'Selesai membaca dan memahami materi pengayaan.',
           soalTerkait: [],
         },
       ],
     };
   }
 
-  // Kelompokkan berdasarkan ringkasan atau kuis
-  const groups = new Map();
+  // Kelompokkan soal salah berdasarkan topik pedagogis nyata (BUKAN judul kuis atau angka kode!)
+  const topicMap = new Map();
   for (const item of wrongQuestions) {
-    const topic = item.ringkasan?.trim() || item.kuisJudul || `Materi Pokok ${namaBab}`;
-    if (!groups.has(topic)) groups.set(topic, []);
-    groups.get(topic).push(item);
+    const meta = detectQuestionTopic(item, namaBab, deskripsiBab);
+    const key = meta.judul;
+    if (!topicMap.has(key)) {
+      topicMap.set(key, { ...meta, items: [] });
+    }
+    topicMap.get(key).items.push(item);
   }
 
-  const tahapan = Array.from(groups.entries()).map(([judul, items], idx) => ({
-    judul,
-    ringkasan: `${items.length} soal terkait materi ini belum tepat pada pengerjaan kuis Anda.`,
-    tujuan: `Memahami kembali kaidah dasar materi ${judul} dan mengenali pola soal yang serupa.`,
-    kegiatan: `Baca kembali modul ${judul} · telaah pembahasan kunci jawaban · coba latihan mandiri terkait kaidah ini.`,
-    soalTerkait: items.map((q, i) => `${q.kuisJudul || 'Kuis'} - Soal: "${q.pertanyaan?.slice(0, 50)}..."`),
-  }));
+  const clusters = Array.from(topicMap.values());
+
+  // Urutkan materi: Prioritas tinggi terlebih dahulu sebelum prioritas sedang
+  clusters.sort((a, b) => {
+    if (a.prioritas.includes('tinggi') && !b.prioritas.includes('tinggi')) return -1;
+    if (!a.prioritas.includes('tinggi') && b.prioritas.includes('tinggi')) return 1;
+    return b.items.length - a.items.length;
+  });
+
+  const tahapan = clusters.map((c, idx) => {
+    const count = Math.min(Math.max(c.items.length, 3), 5);
+    const passing = Math.max(1, Math.ceil(count * 0.7));
+
+    return {
+      tahapKe: idx + 1,
+      judul: c.judul,
+      prioritas: c.prioritas,
+      estimasiWaktu: c.waktu,
+      tujuan: c.tujuan,
+      aktivitas: [
+        `Pelajari konsep dan aturan pokok ${c.judul}.`,
+        `Amati contoh penerapan yang benar (${c.contoh}).`,
+        `Kerjakan ${count} soal latihan penguatan ${c.judul}.`,
+      ],
+      kriteriaSelesai: `minimal ${passing} dari ${count} soal benar.`,
+      soalTerkait: c.items.map((q) => `Soal: "${(q.pertanyaan || '').replace(/\s+/g, ' ').slice(0, 75)}..."`),
+    };
+  });
+
+  // Tahap terakhir WAJIB: Evaluasi pemahaman
+  tahapan.push({
+    tahapKe: tahapan.length + 1,
+    judul: 'Evaluasi pemahaman',
+    prioritas: 'Evaluasi akhir',
+    estimasiWaktu: '10 menit',
+    tujuan: 'Memastikan siswa mampu menerapkan konsep yang sudah dipelajari.',
+    aktivitas: [
+      'Kerjakan kuis evaluasi berisi soal latihan baru.',
+      'Tinjau kembali pembahasan jawaban yang salah.',
+      'Jika belum mencapai target, ulangi materi yang masih lemah.',
+    ],
+    kriteriaSelesai: 'Target evaluasi: minimal 80/100.',
+    soalTerkait: [],
+  });
 
   return {
-    ringkasanBab: `Ditemukan ${wrongQuestions.length} butir soal yang perlu diperkuat pada bab ${namaBab}.`,
+    ringkasanBab: `Ditemukan ${wrongQuestions.length} butir soal yang belum tepat pada bab ${namaBab}. Roadmap disusun dari materi prasyarat hingga evaluasi akhir.`,
     tahapan,
   };
 }
 
 /**
- * Menghasilkan roadmap tahapan belajar dari butir soal salah menggunakan LLM
+ * Menghasilkan roadmap tahapan belajar dari butir soal salah menggunakan LLM OpenRouter
  */
 export async function generateLearningRoadmap({ namaBab, deskripsiBab, wrongQuestions }) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.warn('[OpenRouter] OPENROUTER_API_KEY belum dikonfigurasi, menggunakan fallback generator.');
-    return createFallbackRoadmap(namaBab, wrongQuestions);
+    return createFallbackRoadmap(namaBab, wrongQuestions, deskripsiBab);
   }
 
   if (!wrongQuestions || wrongQuestions.length === 0) {
-    return createFallbackRoadmap(namaBab, []);
+    return createFallbackRoadmap(namaBab, [], deskripsiBab);
   }
 
   const systemPrompt = `Kamu adalah asisten dosen pakar evaluasi kurikulum dan pedagogi pembelajaran pada sistem e-SIKAP.
 Tugasmu adalah menganalisis butir-butir soal yang dijawab SALAH oleh seorang mahasiswa pada Bab: "${namaBab}".
-Karakteristik Bab: ${deskripsiBab || 'Materi pembelajaran Bahasa Indonesia'}.
+Karakteristik Bab: ${deskripsiBab || 'Materi pembelajaran'}.
 
-Instruksi Analisis:
-1. Bacalah setiap pertanyaan, jawaban salah yang dipilih mahasiswa, kunci jawaban yang benar, dan pembahasannya.
-2. Kelompokkan (scope) soal-soal tersebut ke dalam sub-materi/topik yang relevan (misal: "Penulisan Huruf Tebal", "Penulisan Huruf Kapital", "Penggunaan Tanda Hubung", dsb).
-3. Untuk setiap kelompok materi yang salah, buatkan 1 tahapan belajar terstruktur (Tahap 1, Tahap 2, dst.) diurutkan dari prioritas paling mendasar atau paling banyak salah.
-4. Setiap tahap WAJIB memiliki field:
-   - "judul": Nama topik/materi spesifik yang salah.
-   - "ringkasan": Analisis singkat mengapa mahasiswa salah dan bagian mana dari konsep tersebut yang belum dipahami.
-   - "tujuan": Tujuan pembelajaran konkret agar tidak mengulangi kesalahan serupa.
-   - "kegiatan": Rekomendasi aktivitas belajar nyata (misal: pelajari kaidah aturan X, amati perbandingan contoh A dan B, kerjakan latihan mandiri).
-   - "soalTerkait": Array string berisi cuplikan soal atau kuis yang terkait.
-5. Sediakan juga field "ringkasanBab": Rangkuman menyeluruh evaluasi belajar mahasiswa pada bab ini (1-2 kalimat).
-6. Balas HANYA dengan JSON valid tanpa teks pengantar di luar JSON.`;
+Instruksi Analisis (WAJIB DIIKUTI):
+1. Identifikasi learning gap dari butir-butir jawaban yang salah. Kelompokkan soal-soal tersebut ke dalam sub-materi/topik konseptual nyata (misal: "Identifikasi Kata Baku", "Penulisan Kata Depan 'di'", "Kaidah Penulisan Huruf Kapital", "Penulisan dan Fungsi Huruf Tebal", dsb). JANGAN SEKALI-KALI menggunakan nama kuis atau kata seperti "template soal" atau nama bab kode seperti "tes123" atau "123" sebagai judul materi!
+2. Prioritaskan materi prasyarat sebelum materi lanjutan. Beri label "Prioritas tinggi" untuk materi dasar/prasyarat dan "Prioritas sedang" untuk materi lanjutan.
+3. Buat tujuan belajar yang spesifik dan terukur (awali dengan "Siswa mampu..." atau "Siswa memahami...").
+4. Berikan aktivitas belajar dan latihan dalam bentuk array poin-poin konkret:
+   - Pelajari konsep / aturan ...
+   - Amati / pelajari contoh ...
+   - Kerjakan N soal latihan ...
+5. Tentukan kriteria keberhasilan setiap tahap yang terukur (contoh: "minimal 2 dari 3 soal benar" atau "minimal 4 dari 5 soal benar").
+6. Gunakan bahasa sederhana dan jelas untuk mahasiswa.
+7. Jangan mengarang hasil jawaban atau mengklaim kemampuan mahasiswa yang tidak didukung data.
+8. Tahap terakhir pada roadmap WAJIB berupa tahap penutup:
+   - "judul": "Evaluasi pemahaman"
+   - "prioritas": "Evaluasi akhir"
+   - "estimasiWaktu": "10 menit"
+   - "tujuan": "Memastikan siswa mampu menerapkan konsep yang sudah dipelajari."
+   - "aktivitas": [
+       "Kerjakan kuis evaluasi berisi 5 soal baru.",
+       "Tinjau kembali pembahasan jawaban yang salah.",
+       "Jika belum mencapai target, ulangi materi yang masih lemah."
+     ]
+   - "kriteriaSelesai": "Target evaluasi: minimal 80/100."
+   - "soalTerkait": []
+9. Balas HANYA dengan JSON valid sesuai skema yang ditentukan, tanpa teks pengantar di luar blok JSON.`;
 
-  const userPrompt = `Berikut adalah ${wrongQuestions.length} soal yang dijawab salah oleh mahasiswa pada bab "${namaBab}":
+  const userPrompt = `Berikut adalah ${wrongQuestions.length} butir soal yang dijawab salah oleh mahasiswa pada bab "${namaBab}":
 ${JSON.stringify(
   wrongQuestions.map((q, idx) => ({
     nomor: idx + 1,
-    kuis: q.kuisJudul || 'Kuis',
     pertanyaan: q.pertanyaan,
     jawabanSiswaSalah: q.pilihanSiswa || 'Tidak menjawab',
     kunciJawabanBenar: q.kunciJawaban || '-',
     pembahasan: q.pembahasan || '-',
-    kategoriAwal: q.ringkasan || '-',
   })),
   null,
   2
 )}
 
-Buatkan Roadmap Peta Belajar dalam format JSON:
+Susunlah Roadmap Belajar dalam format JSON persis seperti ini:
 {
-  "ringkasanBab": "string",
+  "ringkasanBab": "string (analisis ringkas performa dan learning gap mahasiswa)",
   "tahapan": [
     {
-      "judul": "string",
-      "ringkasan": "string",
-      "tujuan": "string",
-      "kegiatan": "string",
-      "soalTerkait": ["string"]
+      "tahapKe": 1,
+      "judul": "string (Nama topik/materi spesifik)",
+      "prioritas": "string (misal: Prioritas tinggi / Prioritas sedang)",
+      "estimasiWaktu": "string (misal: 15 menit / 20 menit)",
+      "tujuan": "string (Siswa memahami / mampu ...)",
+      "aktivitas": [
+        "Pelajari konsep ...",
+        "Amati contoh ...",
+        "Kerjakan N soal latihan ..."
+      ],
+      "kriteriaSelesai": "string (misal: minimal 2 dari 3 soal benar)",
+      "soalTerkait": ["Soal: ..."]
     }
   ]
 }`;
@@ -165,13 +376,13 @@ Buatkan Roadmap Peta Belajar dalam format JSON:
           ],
           temperature: 0.3,
         }),
-        signal: AbortSignal.timeout(25000), // Timeout 25 detik per model
+        signal: AbortSignal.timeout(45000), // Timeout 45 detik
       });
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         console.warn(`[OpenRouter] Gagal pada model ${model} (${res.status}):`, errorData?.error?.message || res.statusText);
-        continue; // Coba model berikutnya
+        continue;
       }
 
       const data = await res.json();
@@ -185,9 +396,15 @@ Buatkan Roadmap Peta Belajar dalam format JSON:
           tahapan: parsed.tahapan.map((t, idx) => ({
             tahapKe: idx + 1,
             judul: t.judul || `Materi Tahap ${idx + 1}`,
-            ringkasan: t.ringkasan || 'Perlu pendalaman materi.',
+            prioritas: t.prioritas || (idx === 0 ? 'Prioritas tinggi' : 'Prioritas sedang'),
+            estimasiWaktu: t.estimasiWaktu || '15 menit',
             tujuan: t.tujuan || 'Meningkatkan penguasaan konsep.',
-            kegiatan: t.kegiatan || 'Pelajari kembali materi dan kerjakan latihan.',
+            aktivitas: Array.isArray(t.aktivitas)
+              ? t.aktivitas
+              : typeof t.kegiatan === 'string'
+                ? t.kegiatan.split('·').map((s) => s.trim()).filter(Boolean)
+                : ['Pelajari kembali materi yang belum tepat.', 'Amati contoh pembahasan soal.', 'Kerjakan latihan mandiri.'],
+            kriteriaSelesai: t.kriteriaSelesai || 'minimal 2 dari 3 soal benar.',
             soalTerkait: Array.isArray(t.soalTerkait) ? t.soalTerkait : [],
           })),
         };
@@ -199,7 +416,6 @@ Buatkan Roadmap Peta Belajar dalam format JSON:
     }
   }
 
-  console.warn('[OpenRouter] Seluruh panggilan LLM gagal/terbatas, mengaktifkan fallback generator.');
-  return createFallbackRoadmap(namaBab, wrongQuestions);
+  console.warn('[OpenRouter] Seluruh panggilan LLM gagal/terbatas (mis. limit harian tercapai), mengaktifkan fallback generator pedagogis.');
+  return createFallbackRoadmap(namaBab, wrongQuestions, deskripsiBab);
 }
-

@@ -22,9 +22,15 @@
   --color-wf-muted: #9c97ae;
 
   --color-wf-ok: #16a34a;
+  --color-wf-ok-soft: #dcfce7;
+  --color-wf-ok-text: #14532d;
   --color-wf-no: #dc2626;
+  --color-wf-no-soft: #fee2e2;
   --color-wf-no-border: #fca5a5;
   --color-wf-no-text: #7f1d1d;
+  --color-wf-warn: #d97706;
+  --color-wf-warn-soft: #fef3c7;
+  --color-wf-warn-text: #78350f;
 
   --color-wf-accent: #ff8b00;
   --color-wf-accent-hover: #e06b00;

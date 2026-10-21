@@ -82,8 +82,8 @@ export async function generateOrUpdateRoadmapBab(idUser, idBab) {
 
   const completedAttemptIds = completedAttempts.map((a) => a.idPengerjaan);
 
-  // 4. Ambil semua jawaban salah dari attempt-attempt terbaru tersebut
-  const { data: wrongAnswers, error: wrongError } = await supabaseAdmin
+  // 4. Ambil seluruh jawaban dari pengerjaan terbaru kuis-kuis di bab ini
+  const { data: allAnswers, error: answersError } = await supabaseAdmin
     .from('JawabanMahasiswa')
     .select(`
       idSoal,
@@ -101,10 +101,14 @@ export async function generateOrUpdateRoadmapBab(idUser, idBab) {
         opsi:OpsiJawaban (idOpsi, opsi, isCorrect)
       )
     `)
-    .in('idPengerjaan', completedAttemptIds)
-    .or('benar.eq.false,isCorrect.eq.false');
+    .in('idPengerjaan', completedAttemptIds);
 
-  if (wrongError) throw new Error(wrongError.message);
+  if (answersError) throw new Error(answersError.message);
+
+  // Ambil butir soal yang salah dari seluruh kuis bab ini
+  const wrongAnswers = (allAnswers || []).filter((ans) => {
+    return ans.benar === false || ans.isCorrect === false || (!ans.benar && !ans.isCorrect);
+  });
 
   // Format butir soal salah untuk prompt LLM
   const wrongQuestionsFormatted = (wrongAnswers || []).map((ans) => {

@@ -2,21 +2,20 @@
 import { supabaseAdmin } from '../config/db.js';
 import { successResponse, errorResponse } from '../models/apiResponse.js';
 import { ROLE } from '../config/roles.js';
+import { bisaDikelola, bisaAturAkses, KOLOM_AKSES_KUIS } from '../utils/aksesKuis.js';
 import { buatPasswordKuis } from '../utils/passwordKuis.js';
+import { siapkanPengaturanAcak, jumlahSoalDikerjakan } from '../utils/acakSoal.js';
 
 // pembuat:User(nama) = nama dosen pembuat lewat FK Kuis.idUser, supaya daftar kuis
 // dalam satu bab bisa dibedakan ("Kuis 1 - Dosen A", "Kuis 1 - Dosen B").
-const KUIS_COLUMNS = 'idKuis, idUser, idBab, judul, deskripsi, durasi, tanggalDibuat, pin, pembuat:User(nama)';
+const KUIS_COLUMNS =
+  'idKuis, idUser, idBab, judul, deskripsi, durasi, acakSoal, jumlahTampil, tanggalDibuat, pin, aksesKelola, dosenPengelola, pembuat:User(nama)';
 
 // Password kuis dibuat otomatis oleh server saat kuis dibuat (lihat utils/passwordKuis.js):
 // tepat 8 karakter ASCII yang bisa dicetak (huruf besar/kecil, angka, simbol), tanpa spasi.
 // Kolom Kuis.pin harus bertipe teks dan tidak boleh dibatasi CHECK "hanya angka".
 const PIN_FORMAT = /^[\x21-\x7E]{8}$/;
 const PIN_TIDAK_VALID = 'Password kuis harus berupa teks 8 karakter tanpa spasi.';
-
-// idUser NULL = pembuatnya sudah dihapus, kuisnya diwariskan ke semua admin.
-const bisaDikelola = (kuis, user) =>
-  user.role === ROLE.ADMIN && (kuis.idUser === null || kuis.idUser === user.id);
 
 // Password hanya terlihat oleh dosen yang boleh mengelola kuis ini. Mahasiswa dan dosen lain
 // cukup tahu apakah kuis sudah dibuka (adaPin), bukan password-nya.
@@ -27,6 +26,7 @@ const keRespons = ({ pin, pembuat, ...kuis }, user) => {
     namaPembuat: pembuat?.nama ?? null,
     adaPin: pin !== null,
     bisaDikelola: kelola,
+    bisaAturAkses: bisaAturAkses(kuis, user),
     ...(kelola && { pin }),
   };
 };
@@ -74,10 +74,13 @@ export const getAllKuis = async (req, res) => {
 
     const daftar = data.map(({ Soal, ...kuis }) => {
       const hasilTerakhir = riwayatPerKuis.get(kuis.idKuis);
-      const tersedia = kuis.pin !== null && (Soal[0]?.count ?? 0) > 0;
+      const jumlahSoal = Soal[0]?.count ?? 0;
+      const tersedia = kuis.pin !== null && jumlahSoal > 0;
       return {
         ...keRespons(kuis, req.currentUser),
-        jumlahSoal: Soal[0]?.count ?? 0,
+        jumlahSoal,
+        // Jumlah soal yang dikerjakan mahasiswa per percobaan (bisa lebih sedikit kalau acak soal aktif).
+        jumlahSoalTampil: jumlahSoalDikerjakan(kuis, jumlahSoal),
         tersedia,
         nilaiTerakhir: hasilTerakhir?.skorFuzzy ?? null,
         kategoriTerakhir: hasilTerakhir?.kategoriFuzzy ?? null,
@@ -125,6 +128,9 @@ export const createKuis = async (req, res) => {
       return res.status(400).json(errorResponse({ message: 'idBab dan judul wajib diisi.' }));
     }
 
+    const acak = siapkanPengaturanAcak(req.body);
+    if (acak.error) return res.status(400).json(errorResponse({ message: acak.error }));
+
     // durasi opsional: kalau tidak dikirim database memakai default kolomnya (30 menit).
     const payload = {
       idUser: req.currentUser.id,
@@ -132,6 +138,7 @@ export const createKuis = async (req, res) => {
       judul: judul.trim(),
       deskripsi: deskripsi ?? null,
       pin: buatPasswordKuis(),
+      ...acak.data,
     };
     if (durasi !== undefined && durasi !== null) {
       const durasiInt = Number(durasi);
@@ -161,21 +168,22 @@ export const createKuis = async (req, res) => {
   }
 };
 
-// Hanya admin pembuat kuis ini sendiri yang boleh mengubahnya
+// Pemilik dan dosen yang diberi hak kelola boleh mengubah kuis.
 export const updateKuis = async (req, res) => {
   try {
     const { id } = req.params;
     // generatePin: true = buat password baru (dipakai tombol "Generate" di pop-up password).
-    const { idBab, judul, deskripsi, durasi, pin, generatePin } = req.body;
+    const { idBab, judul, deskripsi, durasi, pin, generatePin, acakSoal, jumlahTampil } = req.body;
 
     if (idBab === undefined && judul === undefined && deskripsi === undefined
-      && durasi === undefined && pin === undefined && generatePin === undefined) {
+      && durasi === undefined && pin === undefined && generatePin === undefined
+      && acakSoal === undefined && jumlahTampil === undefined) {
       return res.status(400).json(errorResponse({ message: 'Tidak ada data yang diubah.' }));
     }
 
     const { data: existing, error: findError } = await supabaseAdmin
       .from('Kuis')
-      .select('idKuis, idUser')
+      .select(KOLOM_AKSES_KUIS)
       .eq('idKuis', id)
       .single();
 
@@ -185,11 +193,14 @@ export const updateKuis = async (req, res) => {
 
     if (!bisaDikelola(existing, req.currentUser)) {
       return res.status(403).json(
-        errorResponse({ message: 'Kamu hanya bisa mengubah kuis yang kamu buat sendiri.' }),
+        errorResponse({ message: 'Kamu belum diberi hak untuk mengelola kuis ini.' }),
       );
     }
 
-    const updatePayload = {};
+    const acak = siapkanPengaturanAcak(req.body);
+    if (acak.error) return res.status(400).json(errorResponse({ message: acak.error }));
+
+    const updatePayload = { ...acak.data };
     if (judul !== undefined) {
       if (!judul.trim()) {
         return res.status(400).json(errorResponse({ message: 'Judul tidak boleh kosong.' }));
@@ -251,13 +262,38 @@ export const deleteKuis = async (req, res) => {
       return res.status(404).json(errorResponse({ message: 'Kuis tidak ditemukan.' }));
     }
 
-    if (!bisaDikelola(existing, req.currentUser)) {
+    if (!bisaAturAkses(existing, req.currentUser)) {
       return res.status(403).json(
         errorResponse({ message: 'Kamu hanya bisa menghapus kuis yang kamu buat sendiri.' }),
       );
     }
 
+    // FK Soal.idKuis memakai ON DELETE SET NULL, jadi soal tidak ikut terhapus otomatis.
+    // Catat dulu idSoal-nya, karena setelah kuis dihapus idKuis di soal sudah menjadi NULL.
+    const { data: daftarSoal, error: soalError } = await supabaseAdmin
+      .from('Soal')
+      .select('idSoal')
+      .eq('idKuis', id);
+
+    if (soalError) {
+      return res.status(500).json(errorResponse({ message: soalError.message || 'Gagal membaca soal kuis.' }));
+    }
+
     const { error } = await supabaseAdmin.from('Kuis').delete().eq('idKuis', id);
+
+    if (!error && daftarSoal.length) {
+      // OpsiJawaban dan JawabanMahasiswa ikut terhapus lewat ON DELETE CASCADE.
+      const { error: hapusSoalError } = await supabaseAdmin
+        .from('Soal')
+        .delete()
+        .in('idSoal', daftarSoal.map((s) => s.idSoal));
+
+      if (hapusSoalError) {
+        return res.status(500).json(
+          errorResponse({ message: `Kuis terhapus, tetapi soalnya gagal dihapus: ${hapusSoalError.message}` }),
+        );
+      }
+    }
 
     if (error) {
       // 23503 = foreign key violation — masih dipakai pengerjaan_kuis
@@ -272,5 +308,55 @@ export const deleteKuis = async (req, res) => {
     return res.json(successResponse({ message: `Kuis "${existing.judul}" berhasil dihapus.` }));
   } catch (error) {
     return res.status(500).json(errorResponse({ message: error.message || 'Gagal menghapus kuis.' }));
+  }
+};
+// Daftar minimal profil dosen; tidak menyertakan email atau data autentikasi.
+export const getDosenPengelola = async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin.from('User')
+      .select('idUser, nama, username').eq('role', ROLE.ADMIN).order('nama');
+    if (error) throw error;
+    return res.json(successResponse({ message: 'Daftar dosen.', data }));
+  } catch (error) {
+    return res.status(500).json(errorResponse({ message: error.message }));
+  }
+};
+
+export const updateAksesKuis = async (req, res) => {
+  try {
+    const { aksesKelola, dosenPengelola = [] } = req.body;
+    if (!['pribadi', 'semua', 'tertentu'].includes(aksesKelola)
+      || !Array.isArray(dosenPengelola)
+      || dosenPengelola.some((id) => typeof id !== 'string'
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) {
+      return res.status(400).json(errorResponse({ message: 'Pengaturan hak akses tidak valid.' }));
+    }
+    const { data: kuis, error: findError } = await supabaseAdmin.from('Kuis')
+      .select(KOLOM_AKSES_KUIS).eq('idKuis', req.params.id).maybeSingle();
+    if (findError) throw findError;
+    if (!kuis) return res.status(404).json(errorResponse({ message: 'Kuis tidak ditemukan.' }));
+    if (!bisaAturAkses(kuis, req.currentUser)) {
+      return res.status(403).json(errorResponse({ message: 'Hanya pemilik kuis yang boleh mengatur hak akses.' }));
+    }
+    const ids = aksesKelola === 'tertentu'
+      ? [...new Set(dosenPengelola.map((id) => id.toLowerCase()))].filter((id) => id !== kuis.idUser) : [];
+    if (aksesKelola === 'tertentu' && !ids.length) {
+      return res.status(400).json(errorResponse({ message: 'Pilih minimal satu dosen lain.' }));
+    }
+    if (ids.length) {
+      const { data: dosen, error } = await supabaseAdmin.from('User')
+        .select('idUser').eq('role', ROLE.ADMIN).in('idUser', ids);
+      if (error) throw error;
+      if (dosen.length !== ids.length) {
+        return res.status(400).json(errorResponse({ message: 'Semua pengelola harus berupa akun dosen aktif.' }));
+      }
+    }
+    const { data, error } = await supabaseAdmin.from('Kuis')
+      .update({ aksesKelola, dosenPengelola: ids }).eq('idKuis', req.params.id)
+      .select(KUIS_COLUMNS).single();
+    if (error) throw error;
+    return res.json(successResponse({ message: 'Hak akses kuis berhasil disimpan.', data: keRespons(data, req.currentUser) }));
+  } catch (error) {
+    return res.status(500).json(errorResponse({ message: error.message || 'Gagal menyimpan hak akses.' }));
   }
 };

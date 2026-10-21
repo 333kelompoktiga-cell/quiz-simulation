@@ -4,7 +4,6 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import AdminHeader from '../components/AdminHeader.vue'
 import TombolKembali from '../components/TombolKembali.vue'
 import KuisBukanMilik from '../components/KuisBukanMilik.vue'
-import MathField from '../components/MathField.vue'
 import { setNotice, SessionExpiredError } from '../services/auth'
 import {
   TINGKAT_KESULITAN,
@@ -18,7 +17,6 @@ import {
   simpanSoalKuis,
   importSoalPdf,
 } from '../services/kuis'
-import { keMathLive, keFormatSimpan } from '../utils/mathLive'
 import pencilIcon from '../assets/icons/pencil.svg'
 import fileIcon from '../assets/icons/file.svg'
 import fileUpIcon from '../assets/icons/file-up.svg'
@@ -37,11 +35,21 @@ const router = useRouter()
 const MAKS_OPSI = 6
 const MIN_OPSI = 2
 
+// Aturan acak soal, sama dengan backend/utils/acakSoal.js. Urutan soal selalu diacak;
+// "acak soal" (menampilkan sebagian) hanya bisa dipakai kalau ada minimal 20 soal,
+// minimal 10 ditampilkan, dan selalu ada minimal 10 soal cadangan.
+const MIN_SOAL_ACAK = 20
+const MIN_TAMPIL = 10
+const MIN_CADANGAN = 10
+
 const modeEdit = computed(() => Boolean(props.id))
+const bisaAcak = computed(() => daftarSoal.value.length >= MIN_SOAL_ACAK)
+const maksTampil = computed(() => daftarSoal.value.length - MIN_CADANGAN)
+const acakAktif = computed(() => bisaAcak.value && info.value.acakSoal)
 const metode = ref('manual')
 
 const daftarBab = ref([])
-const info = ref({ judul: '', idBab: null, deskripsi: '', durasi: 30 })
+const info = ref({ judul: '', idBab: null, deskripsi: '', durasi: 30, acakSoal: false, jumlahTampil: MIN_TAMPIL })
 const daftarSoal = ref([soalKosong()])
 const indeksAktif = ref(0)
 
@@ -79,18 +87,15 @@ const tautanKembali = computed(() => (idBabAsal.value ? `/bab/${idBabAsal.value}
 
 // ── Pratinjau teks ──
 function intisari(teks) {
-  return (teks ?? '')
-    .replace(/\$\$[\s\S]+?\$\$/g, ' ⋯ ')
-    .replace(/\$[^$\n]+?\$/g, ' ⋯ ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return (teks ?? '').replace(/\s+/g, ' ').trim()
 }
 
 // ── Validasi ──
 function masalahSoal(s) {
-  if (!s.pertanyaan.trim()) return 'pertanyaan masih kosong'
-  if (s.opsi.length < MIN_OPSI) return `minimal ${MIN_OPSI} opsi jawaban`
-  if (s.opsi.some((o) => !o.trim())) return 'ada opsi jawaban yang kosong'
+  if (!s || typeof s !== 'object') return 'data soal tidak valid'
+  if (typeof s.pertanyaan !== 'string' || !s.pertanyaan.trim()) return 'pertanyaan masih kosong'
+  if (!Array.isArray(s.opsi) || s.opsi.length < MIN_OPSI) return `minimal ${MIN_OPSI} opsi jawaban`
+  if (s.opsi.some((o) => typeof o !== 'string' || !o.trim())) return 'ada opsi jawaban yang kosong'
   if (s.kunci === null) return 'jawaban benar belum dipilih'
   return null
 }
@@ -182,19 +187,16 @@ onMounted(async () => {
       info.value = {
         judul: kuis.judul,
         idBab: kuis.idBab,
-        deskripsi: keMathLive(kuis.deskripsi ?? ''),
+        deskripsi: kuis.deskripsi ?? '',
         durasi: kuis.durasi ?? 30,
+        acakSoal: kuis.acakSoal === true,
+        jumlahTampil: kuis.jumlahTampil ?? MIN_TAMPIL,
       }
 
       try {
         const soalLama = await ambilSoalKuis(props.id)
         if (soalLama.length) {
-          daftarSoal.value = soalLama.map((s) => ({
-            ...s,
-            pertanyaan: keMathLive(s.pertanyaan),
-            opsi: (s.opsi ?? []).map(keMathLive),
-            pembahasan: keMathLive(s.pembahasan ?? ''),
-          }))
+          daftarSoal.value = soalLama
         }
       } catch (err) {
         if (!(err instanceof EndpointBelumAdaError)) throw err
@@ -242,20 +244,23 @@ async function simpan() {
     errorMsg.value = `Soal ${indeksSalah + 1}: ${masalahSoal(daftarSoal.value[indeksSalah])}.`
     return
   }
+  const tampil = info.value.jumlahTampil
+  if (acakAktif.value && (!Number.isInteger(tampil) || tampil < MIN_TAMPIL || tampil > maksTampil.value)) {
+    errorMsg.value = `Jumlah soal yang ditampilkan harus ${MIN_TAMPIL} sampai ${maksTampil.value} (minimal ${MIN_CADANGAN} soal cadangan).`
+    return
+  }
 
   menyimpan.value = true
   const dataKuis = {
     judul: info.value.judul.trim(),
     idBab: info.value.idBab,
-    deskripsi: keFormatSimpan(info.value.deskripsi).trim() || null,
+    deskripsi: info.value.deskripsi.trim() || null,
     durasi: info.value.durasi,
+    // Di bawah 20 soal opsi acak soal dimatikan; urutan soal tetap diacak oleh backend.
+    acakSoal: acakAktif.value,
+    jumlahTampil: acakAktif.value ? tampil : null,
   }
-  const dataSoal = daftarSoal.value.map((s) => ({
-    ...s,
-    pertanyaan: keFormatSimpan(s.pertanyaan),
-    opsi: s.opsi.map((o) => keFormatSimpan(o)),
-    pembahasan: keFormatSimpan(s.pembahasan),
-  }))
+  const dataSoal = daftarSoal.value
 
   try {
     if (idKuisTersimpan.value) {
@@ -551,10 +556,12 @@ async function simpanDokumen() {
               <span class="text-[16px] lg:text-[18px] leading-5 font-semibold tracking-[1px] text-wf-muted">
                 PERTANYAAN
               </span>
-              <MathField
+              <textarea
                 v-model="soal.pertanyaan"
+                rows="4"
                 placeholder="Tulis pertanyaan di sini."
-              />
+                class="w-full field-sizing-content min-h-32 resize-y bg-wf-card border border-wf-border rounded-md p-4 text-[17px] leading-6 focus:outline-none focus:ring-2 focus:ring-wf-brand"
+              ></textarea>
 
               <label class="flex flex-col gap-2 w-full sm:w-[360px] mt-1">
                 <span class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">DURASI (MENIT)</span>
@@ -567,24 +574,67 @@ async function simpanDokumen() {
                 />
                 <span class="text-[13px] text-wf-muted">Lama pengerjaan seluruh kuis, berlaku untuk semua soal.</span>
               </label>
+
+              <div class="flex flex-col gap-2 mt-1">
+                <label
+                  class="flex items-center gap-3 self-start"
+                  :class="bisaAcak ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
+                >
+                  <input
+                    v-model="info.acakSoal"
+                    type="checkbox"
+                    :disabled="!bisaAcak"
+                    class="size-5 accent-wf-brand"
+                  />
+                  <span class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">ACAK SOAL</span>
+                </label>
+
+                <label v-if="acakAktif" class="flex flex-col gap-2 w-full sm:w-[360px]">
+                  <span class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">JUMLAH SOAL DITAMPILKAN</span>
+                  <input
+                    v-model.number="info.jumlahTampil"
+                    type="number"
+                    :min="MIN_TAMPIL"
+                    :max="maksTampil"
+                    step="1"
+                    class="bg-wf-card border border-wf-border rounded-md p-4 text-[17px] leading-6 focus:outline-none focus:ring-2 focus:ring-wf-brand"
+                  />
+                </label>
+
+                <span class="text-[13px] text-wf-muted">
+                  <template v-if="!bisaAcak">
+                    Acak soal butuh minimal {{ MIN_SOAL_ACAK }} soal (sekarang {{ daftarSoal.length }}).
+                    Semua soal ditampilkan, urutannya tetap diacak untuk tiap mahasiswa.
+                  </template>
+                  <template v-else-if="acakAktif">
+                    Tiap mahasiswa mendapat {{ info.jumlahTampil || 0 }} soal acak dari {{ daftarSoal.length }} soal
+                    (boleh {{ MIN_TAMPIL }}–{{ maksTampil }}, minimal {{ MIN_CADANGAN }} cadangan). Urutannya juga diacak.
+                  </template>
+                  <template v-else>
+                    Semua {{ daftarSoal.length }} soal ditampilkan, urutannya diacak untuk tiap mahasiswa.
+                    Nyalakan untuk menampilkan sebagian soal secara acak.
+                  </template>
+                </span>
+              </div>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
               <button
                 type="button"
                 @click="pindahKe(indeksAktif - 1)"
                 :disabled="indeksAktif === 0"
-                class="rounded-xl border px-4 lg:px-5 py-3 text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] disabled:bg-wf-muted-surface disabled:border-wf-border-subtle disabled:text-wf-muted bg-wf-card border-wf-brand-border text-wf-brand"
+                class="shrink-0 whitespace-nowrap rounded-xl border px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 text-[14px] sm:text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] disabled:bg-wf-muted-surface disabled:border-wf-border-subtle disabled:text-wf-muted bg-wf-card border-wf-brand-border text-wf-brand"
               >
                 ← SEBELUMNYA
               </button>
-              <p class="flex-1 text-center text-[16px] lg:text-[19px] leading-[26px] text-wf-secondary">
-                Soal {{ indeksAktif + 1 }} dari {{ daftarSoal.length }}
+              <p class="flex-1 min-w-0 whitespace-nowrap text-center text-[14px] sm:text-[16px] lg:text-[19px] leading-[26px] text-wf-secondary">
+                <span class="sm:hidden">{{ indeksAktif + 1 }}/{{ daftarSoal.length }}</span>
+                <span class="hidden sm:inline">Soal {{ indeksAktif + 1 }} dari {{ daftarSoal.length }}</span>
               </p>
               <button
                 type="button"
                 @click="selanjutnya"
-                class="rounded-xl bg-wf-card border border-wf-brand-border px-4 lg:px-5 py-3 text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] text-wf-brand"
+                class="shrink-0 whitespace-nowrap rounded-xl bg-wf-card border border-wf-brand-border px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 text-[14px] sm:text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] text-wf-brand"
               >
                 {{ indeksAktif === daftarSoal.length - 1 ? '+ SOAL BARU' : 'SELANJUTNYA →' }}
               </button>
@@ -603,24 +653,25 @@ async function simpanDokumen() {
             </div>
 
             <ul class="flex flex-col gap-3">
-              <li v-for="(_, i) in soal.opsi" :key="i" class="flex items-center gap-3">
+              <li v-for="(_, i) in soal.opsi" :key="i" class="flex items-start gap-3">
                 <span class="size-12 shrink-0 flex items-center justify-center bg-wf-muted-surface border border-wf-border rounded-md text-[19px] font-semibold">
                   {{ hurufOpsi(i) }}
                 </span>
                 <div class="flex-1 min-w-0">
-                  <MathField
+                  <textarea
                     v-model="soal.opsi[i]"
-                    dense
+                    rows="1"
                     :aria-label="`Opsi ${hurufOpsi(i)}`"
                     :placeholder="`Isi opsi ${hurufOpsi(i)}`"
-                  />
+                    class="block w-full field-sizing-content min-h-12 resize-none bg-wf-card border border-wf-border rounded-md px-4 py-3 text-[17px] leading-6 focus:outline-none focus:ring-2 focus:ring-wf-brand"
+                  ></textarea>
                 </div>
                 <button
                   type="button"
                   @click="hapusOpsi(i)"
                   :disabled="soal.opsi.length <= MIN_OPSI"
                   :aria-label="`Hapus opsi ${hurufOpsi(i)}`"
-                  class="text-[19px] font-semibold text-wf-no disabled:text-wf-border px-1"
+                  class="mt-2.5 text-[19px] font-semibold text-wf-no disabled:text-wf-border px-1"
                 >
                   ✕
                 </button>
@@ -629,10 +680,12 @@ async function simpanDokumen() {
 
             <div class="flex flex-col gap-2">
               <span class="text-[15px] leading-5 font-semibold tracking-[1px] text-wf-muted">PEMBAHASAN</span>
-              <MathField
+              <textarea
                 v-model="soal.pembahasan"
+                rows="4"
                 placeholder="Jelaskan mengapa jawaban tersebut benar."
-              />
+                class="w-full field-sizing-content min-h-32 resize-y bg-wf-card border border-wf-border rounded-md p-4 text-[17px] leading-6 focus:outline-none focus:ring-2 focus:ring-wf-brand"
+              ></textarea>
             </div>
 
             <button
@@ -647,7 +700,7 @@ async function simpanDokumen() {
 
           <!-- Kolom kanan -->
           <aside class="w-full lg:w-[320px] shrink-0 flex flex-col gap-5">
-            <div class="border border-wf-border-subtle rounded-xl p-5 flex flex-col gap-3">
+            <div class="bg-wf-card border border-wf-border-subtle rounded-xl p-5 flex flex-col gap-3">
               <p class="text-[15px] leading-5 font-semibold tracking-[1px] text-wf-muted">NAVIGASI SOAL</p>
               <div class="grid grid-cols-5 gap-2">
                 <button
@@ -676,7 +729,7 @@ async function simpanDokumen() {
               </p>
             </div>
 
-            <div class="border border-wf-border-subtle rounded-xl p-5 flex flex-col gap-3">
+            <div class="bg-wf-card border border-wf-border-subtle rounded-xl p-5 flex flex-col gap-3">
               <p class="text-[15px] leading-5 font-semibold tracking-[1px] text-wf-muted">PENGATURAN SOAL</p>
               <label for="kesulitan" class="text-[15px] leading-5 font-semibold tracking-[1px] text-wf-secondary">
                 TINGKAT KESULITAN
@@ -690,14 +743,14 @@ async function simpanDokumen() {
               </select>
             </div>
 
-            <fieldset class="border border-wf-border-subtle rounded-xl p-5 flex flex-col gap-3">
+            <fieldset class="min-w-0 bg-wf-card border border-wf-border-subtle rounded-xl p-5 flex flex-col gap-3">
               <legend class="sr-only">Jawaban yang benar</legend>
               <p class="text-[15px] leading-5 font-semibold tracking-[1px] text-wf-muted">JAWABAN YANG BENAR</p>
               <p class="text-[15px] lg:text-[17px] leading-6 text-wf-secondary">Pilih satu opsi sebagai jawaban benar.</p>
               <label
                 v-for="(teks, i) in soal.opsi"
                 :key="i"
-                class="flex items-center gap-2.5 px-3.5 py-3 rounded-md cursor-pointer"
+                class="flex items-start gap-2.5 px-3.5 py-3 rounded-md cursor-pointer"
                 :class="soal.kunci === i ? 'bg-wf-brand-soft border-2 border-wf-brand' : 'bg-wf-card border border-wf-border-subtle'"
               >
                 <input
@@ -708,13 +761,13 @@ async function simpanDokumen() {
                   :aria-label="`Opsi ${hurufOpsi(i)} benar`"
                   class="sr-only"
                 />
-                <span class="size-5 shrink-0">
+                <span class="size-5 shrink-0 mt-0.5">
                   <img v-if="soal.kunci === i" :src="radioCheckedIcon" alt="" class="size-full" />
                   <span v-else class="block size-full rounded-full border border-wf-border"></span>
                 </span>
                 <span class="text-[19px] leading-[26px] font-semibold">{{ hurufOpsi(i) }}</span>
                 <span
-                  class="flex-1 min-w-0 truncate text-[15px] lg:text-[17px] leading-6"
+                  class="flex-1 min-w-0 break-words text-[15px] lg:text-[17px] leading-6"
                   :class="soal.kunci === i ? 'text-wf-text' : 'text-wf-muted'"
                 >
                   {{ intisari(teks) || '(kosong)' }}

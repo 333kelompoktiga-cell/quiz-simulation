@@ -1,6 +1,7 @@
 // controllers/SoalController.js
 // Bentuk data soal mengikuti frontend/docs/KONTRAK_API_SOAL.md.
 import { supabaseAdmin } from '../config/db.js';
+import { bisaDikelola, KOLOM_AKSES_KUIS } from '../utils/aksesKuis.js';
 import { ROLE } from '../config/roles.js';
 import { successResponse, errorResponse } from '../models/apiResponse.js';
 
@@ -29,7 +30,7 @@ const teksAtauNull = (nilai) => {
 // Memeriksa satu soal dari body dan mengubahnya ke bentuk kolom database.
 // Mengembalikan { error } atau { data }. `wajibSemua` = false untuk PUT /api/soal/:id,
 // di mana field yang tidak dikirim tidak ikut diubah.
-const siapkanSoal = (body, { wajibSemua }) => {
+export const siapkanSoal = (body, { wajibSemua }) => {
   const data = {};
   const ada = (field) => wajibSemua || body[field] !== undefined;
 
@@ -91,13 +92,13 @@ const urutkanSoal = (query) =>
 
 // Soal tidak punya pemilik sendiri — pemiliknya adalah pembuat kuisnya.
 // Mengembalikan { status, message } kalau ditolak, atau null kalau admin ini boleh mengurusnya.
-const cekAksesKuis = async (idKuis, currentUserId) => {
+export const cekAksesKuis = async (idKuis, currentUserId) => {
   // Soal tanpa kuis = bank soal, boleh diurus admin mana pun.
   if (idKuis === null) return null;
 
   const { data: kuis, error } = await supabaseAdmin
     .from('Kuis')
-    .select('idKuis, idUser')
+    .select(KOLOM_AKSES_KUIS)
     .eq('idKuis', idKuis)
     .maybeSingle();
 
@@ -106,8 +107,8 @@ const cekAksesKuis = async (idKuis, currentUserId) => {
   }
 
   // idUser NULL = pembuatnya sudah dihapus, kuisnya diwariskan ke semua admin.
-  if (kuis.idUser !== null && kuis.idUser !== currentUserId) {
-    return { status: 403, message: 'Kamu hanya bisa mengelola soal pada kuis yang kamu buat sendiri.' };
+  if (!bisaDikelola(kuis, { id: currentUserId, role: ROLE.ADMIN })) {
+    return { status: 403, message: 'Kamu belum diberi hak untuk mengelola soal kuis ini.' };
   }
 
   return null;

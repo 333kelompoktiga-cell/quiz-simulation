@@ -6,3 +6,5 @@ PULL_BACKEND.md
 how-to-push.md
 database/
 opencode.json
+
+migrations/

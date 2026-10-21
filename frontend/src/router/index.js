@@ -17,6 +17,9 @@ import StudentDiagnosticView from '../views/StudentDiagnosticView.vue'
 import StudentStatisticsView from '../views/StudentStatisticsView.vue'
 import StudentLearningMapView from '../views/StudentLearningMapView.vue'
 import StudentRoadmapView from '../views/StudentRoadmapView.vue'
+import RekapView from '../views/RekapView.vue'
+import RekapKuisView from '../views/RekapKuisView.vue'
+import RekapPengerjaanView from '../views/RekapPengerjaanView.vue'
 import { ROLE } from '../services/roles'
 import {
   isLoggedIn,
@@ -59,6 +62,10 @@ const router = createRouter({
     { path: '/kuis/tambah', name: 'tambah-kuis', component: EditorKuisView, meta: khususAdmin },
     { path: '/kuis/:id/edit', name: 'edit-kuis', component: KuisFormView, props: true, meta: khususAdmin },
     { path: '/kuis/:id/soal', name: 'edit-soal', component: EditorKuisView, props: true, meta: khususAdmin },
+    // Report Nilai (Figma HA6-HA8): daftar kuis → rekap satu kuis → detail satu percobaan.
+    { path: '/rekap', name: 'rekap', component: RekapView, meta: khususAdmin },
+    { path: '/rekap/kuis/:id', name: 'rekap-kuis', component: RekapKuisView, props: true, meta: khususAdmin },
+    { path: '/rekap/pengerjaan/:id', name: 'rekap-pengerjaan', component: RekapPengerjaanView, props: true, meta: khususAdmin },
     { path: '/akun', name: 'kelola-akun', component: KelolaAkunView, meta: khususSuperAdmin },
     // Alamat ngawur diarahkan ke login, bukan halaman kosong.
     { path: '/:pathMatch(.*)*', redirect: '/' },

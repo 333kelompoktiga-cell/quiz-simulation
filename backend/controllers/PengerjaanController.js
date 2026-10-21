@@ -3,6 +3,7 @@ import { successResponse, errorResponse } from '../models/apiResponse.js';
 import { evaluateQuiz } from '../services/fuzzyService.js';
 import { samaPassword } from '../utils/passwordKuis.js';
 import { generateOrUpdateRoadmapBab } from '../services/roadmapService.js';
+import { pilihSoalPengerjaan, soalMilikPengerjaan } from '../utils/acakSoal.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SOAL_SELECT =
@@ -21,7 +22,7 @@ function difficultyLabel(value) {
 async function getOwnedAttempt(idPengerjaan, idUser) {
   const { data, error } = await supabaseAdmin
     .from('PengerjaanKuis')
-    .select('idPengerjaan, idUser, idKuis, attempt, status, waktuMulai, waktuSelesai, score, skorFuzzy, kategoriFuzzy, totalSoal, totalBenar, totalSalah, akurasi, rataRataWaktu, durasiPengerjaan, rekomendasi, distribusiTingkat, distribusiKesulitan, hasilDetail')
+    .select('idPengerjaan, idUser, idKuis, attempt, status, urutanSoal, waktuMulai, waktuSelesai, score, skorFuzzy, kategoriFuzzy, totalSoal, totalBenar, totalSalah, akurasi, rataRataWaktu, durasiPengerjaan, rekomendasi, distribusiTingkat, distribusiKesulitan, hasilDetail')
     .eq('idPengerjaan', idPengerjaan)
     .eq('idUser', idUser)
     .maybeSingle();
@@ -40,6 +41,13 @@ async function getQuizQuestions(idKuis) {
   return { data, error };
 }
 
+// Soal yang dikerjakan pada satu percobaan: hasil acakan yang disimpan saat percobaan dimulai.
+async function getAttemptQuestions(attempt) {
+  const { data, error } = await getQuizQuestions(attempt.idKuis);
+  if (error) return { data: null, error };
+  return { data: soalMilikPengerjaan(attempt, data), error: null };
+}
+
 async function validateAndSaveAnswers(res, attempt, answers) {
   if (!Array.isArray(answers)) {
     res.status(400).json(errorResponse({ message: 'Body harus memuat array jawaban.' }));
@@ -51,7 +59,7 @@ async function validateAndSaveAnswers(res, attempt, answers) {
   }
   if (answers.length === 0) return 0;
 
-  const questionsResult = await getQuizQuestions(attempt.idKuis);
+  const questionsResult = await getAttemptQuestions(attempt);
   if (questionsResult.error) {
     dbError(res, questionsResult.error, 'Gagal memeriksa soal kuis.');
     return null;
@@ -60,7 +68,7 @@ async function validateAndSaveAnswers(res, attempt, answers) {
   const questionIds = new Set();
   for (const answer of answers) {
     if (!uuidValid(answer?.idSoal) || !questionById.has(answer.idSoal)) {
-      res.status(400).json(errorResponse({ message: 'Jawaban memuat soal yang bukan bagian dari kuis ini.' }));
+      res.status(400).json(errorResponse({ message: 'Jawaban memuat soal yang bukan bagian dari pengerjaan ini.' }));
       return null;
     }
     if (questionIds.has(answer.idSoal)) {
@@ -127,13 +135,13 @@ export const mulaiPengerjaan = async (req, res) => {
 
     const { data: kuisDb, error: kuisError } = await supabaseAdmin
       .from('Kuis')
-      .select('idKuis, judul, durasi, pin')
+      .select('idKuis, judul, durasi, pin, acakSoal, jumlahTampil')
       .eq('idKuis', idKuis)
       .maybeSingle();
     if (kuisError) return dbError(res, kuisError, 'Gagal memeriksa kuis.');
     if (!kuisDb) return res.status(404).json(errorResponse({ message: 'Kuis tidak ditemukan.' }));
     // PIN dipisah supaya tidak ikut terkirim ke mahasiswa di respons
-    const { pin: pinKuis, ...kuis } = kuisDb;
+    const { pin: pinKuis, acakSoal, jumlahTampil, ...kuis } = kuisDb;
 
     const { data: questions, error: questionsError } = await getQuizQuestions(idKuis);
     if (questionsError) return dbError(res, questionsError, 'Gagal memuat soal kuis.');
@@ -148,7 +156,7 @@ export const mulaiPengerjaan = async (req, res) => {
 
     let { data: attempt, error: attemptError } = await supabaseAdmin
       .from('PengerjaanKuis')
-      .select('idPengerjaan, attempt, status, waktuMulai')
+      .select('idPengerjaan, attempt, status, urutanSoal, waktuMulai')
       .eq('idUser', req.currentUser.id)
       .eq('idKuis', idKuis)
       .eq('status', 'berlangsung')
@@ -190,6 +198,9 @@ export const mulaiPengerjaan = async (req, res) => {
           idUser: req.currentUser.id,
           idKuis,
           attempt: (count || 0) + 1,
+          // Soal dipilih & diacak sekali di sini, supaya tetap sama saat halaman di-refresh,
+          // dan penilaian/pembahasan memakai soal yang sama dengan yang dikerjakan.
+          urutanSoal: pilihSoalPengerjaan({ acakSoal, jumlahTampil }, questions),
           score: 0,
           waktuMulai: new Date().toISOString(),
           status: 'berlangsung',
@@ -202,10 +213,23 @@ export const mulaiPengerjaan = async (req, res) => {
           rataRataWaktu: 0,
           durasiPengerjaan: 0,
         })
-        .select('idPengerjaan, attempt, status, waktuMulai')
+        .select('idPengerjaan, attempt, status, urutanSoal, waktuMulai')
         .single();
       if (insertError) return dbError(res, insertError, 'Gagal memulai pengerjaan kuis.');
       attempt = created;
+    }
+
+    let attemptQuestions = soalMilikPengerjaan(attempt, questions);
+    // Semua soal hasil acakan sudah diganti dosen saat percobaan masih berlangsung: acak ulang.
+    if (!attemptQuestions.length) {
+      const urutanSoal = pilihSoalPengerjaan({ acakSoal, jumlahTampil }, questions);
+      const { error: ulangError } = await supabaseAdmin
+        .from('PengerjaanKuis')
+        .update({ urutanSoal })
+        .eq('idPengerjaan', attempt.idPengerjaan);
+      if (ulangError) return dbError(res, ulangError, 'Gagal menyiapkan soal pengerjaan.');
+      attempt = { ...attempt, urutanSoal };
+      attemptQuestions = soalMilikPengerjaan(attempt, questions);
     }
 
     const { data: savedAnswers, error: savedAnswersError } = await supabaseAdmin
@@ -214,9 +238,10 @@ export const mulaiPengerjaan = async (req, res) => {
       .eq('idPengerjaan', attempt.idPengerjaan);
     if (savedAnswersError) return dbError(res, savedAnswersError, 'Gagal memuat jawaban tersimpan.');
 
-    const safeQuestions = questions.map((question) => ({
+    const { urutanSoal: _urutan, ...pengerjaan } = attempt;
+    const safeQuestions = attemptQuestions.map((question, index) => ({
       idSoal: question.idSoal,
-      urutan: question.urutan,
+      urutan: index + 1,
       pertanyaan: question.pertanyaan,
       difficulty: difficultyLabel(question.difficulty),
       targetTime: question.targetTime,
@@ -225,7 +250,7 @@ export const mulaiPengerjaan = async (req, res) => {
     return res.json(successResponse({
       message: 'Pengerjaan kuis siap.',
       data: {
-        pengerjaan: attempt,
+        pengerjaan,
         kuis,
         soal: safeQuestions,
         jawaban: savedAnswers || [],
@@ -278,7 +303,7 @@ export const submitPengerjaan = async (req, res) => {
 
     const [{ data: kuis, error: kuisError }, { data: questions, error: questionsError }] = await Promise.all([
       supabaseAdmin.from('Kuis').select('idKuis, idBab, judul, durasi').eq('idKuis', attempt.idKuis).maybeSingle(),
-      getQuizQuestions(attempt.idKuis),
+      getAttemptQuestions(attempt),
     ]);
     if (kuisError) return dbError(res, kuisError, 'Gagal memuat kuis.');
     if (questionsError) return dbError(res, questionsError, 'Gagal memuat soal kuis.');
@@ -423,7 +448,7 @@ export const getPembahasan = async (req, res) => {
     }
 
     const [{ data: questions, error: questionsError }, { data: answers, error: answersError }] = await Promise.all([
-      getQuizQuestions(attempt.idKuis),
+      getAttemptQuestions(attempt),
       supabaseAdmin.from('JawabanMahasiswa')
         .select('idSoal, idOpsi, benar, responseTime, skorFuzzy, kategoriFuzzy')
         .eq('idPengerjaan', idPengerjaan),

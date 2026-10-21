@@ -1,0 +1,7 @@
+.env
+.gitignore
+opencode.json
+sql supabase
+CAPSTONE-Entity Relationship Diagram.dbml
+CAPSTONE-Entity Relationship Diagram.drawio.png
+docs/migrations/

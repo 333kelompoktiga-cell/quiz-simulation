@@ -1,7 +1,7 @@
 // routes/kuisRoute.js
 import express from 'express';
 import {
-  getAllKuis, getKuisById, createKuis, updateKuis, deleteKuis,
+  getDosenPengelola, updateAksesKuis, getAllKuis, getKuisById, createKuis, updateKuis, deleteKuis,
 } from '../controllers/KuisController.js';
 import { getSoalKuis, simpanSoalKuis } from '../controllers/SoalController.js';
 import { verifyLoggedIn } from '../middleware/verifyLoggedIn.js';
@@ -10,6 +10,8 @@ import { verifyAdmin } from '../middleware/verifyAdmin.js';
 const router = express.Router();
 
 router.get('/', verifyLoggedIn, getAllKuis);
+router.get('/dosen-pengelola', verifyLoggedIn, verifyAdmin, getDosenPengelola);
+router.put('/:id/akses', verifyLoggedIn, verifyAdmin, updateAksesKuis);
 router.get('/:id', verifyLoggedIn, getKuisById);
 router.post('/', verifyLoggedIn, verifyAdmin, createKuis);
 router.put('/:id', verifyLoggedIn, verifyAdmin, updateKuis);
