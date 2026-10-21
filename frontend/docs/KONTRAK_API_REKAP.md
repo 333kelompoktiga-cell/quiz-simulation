@@ -96,7 +96,8 @@ Urutan: `terakhirDikerjakan` terbaru dulu, kuis tanpa peserta di akhir.
         "nomor": 4,
         "pertanyaan": "Huruf kapital pada nama gelar",
         "persenBenar": 29.2,
-        "rataRataWaktu": 41.3
+        "rataRataWaktu": 41.3,
+        "jumlahMenjawab": 24
       }
     ],
     "mahasiswa": [
@@ -119,9 +120,11 @@ Urutan: `terakhirDikerjakan` terbaru dulu, kuis tanpa peserta di akhir.
 ```
 
 - `sebaranKategori`: jumlah mahasiswa per kategori (percobaan terakhir). Keempat kunci selalu ada, boleh `0`.
-- `soalPalingBanyakSalah`: dihitung dari `JawabanMahasiswa` pada percobaan terakhir tiap mahasiswa,
+- `soalPalingBanyakSalah`: dihitung dari `PengerjaanKuis.hasilDetail` pada percobaan terakhir yang
+  `selesai` tiap mahasiswa (`meta.isCorrect` untuk benar/salah, `meta.responseTime` untuk waktu),
   diurutkan dari `persenBenar` terkecil. Cukup kirim 5 teratas; frontend menampilkan 3.
   `nomor` = urutan soal di kuis (bukan urutan acak saat dikerjakan). `rataRataWaktu` dalam detik.
+  `jumlahMenjawab` = banyaknya mahasiswa yang mendapat soal itu. Soal yang sudah dihapus dari kuis tidak ditampilkan.
 - `mahasiswa`: urutan bebas (frontend mengurutkan sendiri berdasarkan skor atau nama).
 - Kuis tanpa peserta: `jumlahPeserta: 0`, `rataRataSkorFuzzy: null`, `mahasiswa: []`.
 - Error: `404` kuis tidak ada, `403` bukan pengelola kuis.

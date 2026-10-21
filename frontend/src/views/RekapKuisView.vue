@@ -14,7 +14,7 @@ import {
   formatDurasi,
   formatSkor,
   labelKategori,
-  unduhCsvRekap,
+  unduhExcelRekap,
   warnaKategori,
 } from '../services/rekap'
 
@@ -33,6 +33,8 @@ const cari = ref('')
 const filterKategori = ref('semua')
 const urut = ref({ kolom: 'skor', arah: 'turun' })
 const tampilSemua = ref(false)
+const mengunduh = ref(false)
+const errorUnduh = ref('')
 
 const kuis = computed(() => rekap.value?.kuis ?? {})
 const keteranganKuis = computed(() => {
@@ -75,6 +77,20 @@ const mahasiswaTampil = computed(() => (tampilSemua.value ? mahasiswa.value : ma
 
 // Daftar dipendekkan lagi setiap kali filter berubah.
 watch([cari, filterKategori], () => (tampilSemua.value = false))
+
+// Unduhan berisi semua mahasiswa sesuai urutan tabel, tanpa terpengaruh filter.
+async function unduhExcel() {
+  if (mengunduh.value) return
+  errorUnduh.value = ''
+  mengunduh.value = true
+  try {
+    await unduhExcelRekap(kuis.value.judul, mahasiswaUrut.value)
+  } catch (err) {
+    errorUnduh.value = `File Excel gagal dibuat. ${err?.message ?? ''}`.trim()
+  } finally {
+    mengunduh.value = false
+  }
+}
 
 // Klik kategori di kartu evaluasi = filter tabel ke kategori itu (klik lagi untuk batal),
 // lalu gulir ke daftar mahasiswa supaya hasilnya langsung terlihat.
@@ -151,12 +167,16 @@ onMounted(async () => {
           <button
             v-if="rekap.mahasiswa?.length"
             type="button"
-            @click="unduhCsvRekap(kuis.judul, mahasiswaUrut)"
+            @click="unduhExcel"
+            :aria-busy="mengunduh"
             class="rounded-xl border border-wf-brand-border bg-wf-card hover:bg-wf-brand-soft px-6 py-4 text-[18px] lg:text-[20px] leading-7 font-semibold tracking-[0.2px] text-wf-brand transition"
           >
-            UNDUH EXCEL
+            {{ mengunduh ? 'MENYIAPKAN...' : 'UNDUH EXCEL' }}
           </button>
         </div>
+        <p v-if="errorUnduh" role="alert" class="rounded-md bg-red-50 border border-wf-no-border px-4 py-3 text-[15px] text-wf-no-text">
+          {{ errorUnduh }}
+        </p>
 
         <div class="grid gap-4 sm:grid-cols-3">
           <KotakRingkasan :angka="rekap.ringkasan?.jumlahPeserta ?? 0" label="Peserta" />
