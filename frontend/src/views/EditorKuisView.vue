@@ -785,6 +785,9 @@ async function simpanDokumen() {
       >
         <div class="flex flex-col gap-1">
           <h2 class="text-[22px] leading-[30px] font-semibold">Unggah dokumen kuis</h2>
+          <a href="https://docs.google.com/document/d/13dNI81pmQpRn92Dh8pAzdO_tHg7cyWenxu30-0bTR-A/edit?pli=1&tab=t.0" target="_blank" rel="noopener noreferrer" class="text-wf-brand hover:text-wf-brand-hover focus:outline-none focus:ring-2 focus:ring-wf-brand" >
+            Template Soal
+          </a>
           <p class="text-[17px] leading-6 text-wf-secondary">
             Lampirkan PDF berisi soal, kunci jawaban, dan pembahasan. Soal diekstrak otomatis dari rentang halaman yang dipilih.
           </p>
