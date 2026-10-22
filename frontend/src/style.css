@@ -48,3 +48,10 @@
 @utility tombol-aksi-bahaya {
   @apply tombol-aksi border-wf-no-border text-wf-no hover:bg-red-50;
 }
+
+/* Tombol navigasi kembali untuk halaman mahasiswa agar mudah ditemukan. */
+@utility tombol-kembali {
+  @apply inline-flex min-h-12 items-center gap-2 rounded-xl border-2 border-wf-brand bg-wf-brand-soft px-5 py-3
+    text-[16px] font-bold text-wf-brand shadow-sm transition
+    hover:bg-wf-brand hover:text-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-wf-brand/25;
+}

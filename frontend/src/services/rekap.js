@@ -1,5 +1,6 @@
 import { kirimTerautentikasi } from './auth'
 import { EndpointBelumAdaError } from './kuis'
+import writeExcelFile from 'write-excel-file/browser'
 
 // Rekap skor fuzzy untuk dosen (menu Report Nilai, Figma HA6-HA8).
 // Endpoint-nya belum ada di backend; bentuk yang diharapkan frontend ditulis
@@ -83,7 +84,6 @@ export function catatanWaktuSoal(soal) {
 // (bisa dihitung di Excel), NIM sebagai teks supaya angka 0 di depan tidak hilang.
 // Skor dibulatkan seperti yang tampil di layar.
 export async function unduhExcelRekap(judulKuis, daftarMahasiswa) {
-  const { default: writeExcelFile } = await import('write-excel-file/universal')
   const angka = (v) => (v == null || v === '' ? null : Number(v))
   const judulKolom = ['Nama', 'NIM', 'Skor fuzzy', 'Kategori', 'Benar', 'Jumlah soal', 'Percobaan', 'Selesai']
   const data = [

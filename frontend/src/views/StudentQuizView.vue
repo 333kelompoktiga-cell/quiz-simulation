@@ -248,7 +248,10 @@ onBeforeUnmount(() => window.clearInterval(timerId))
       <section v-else-if="submitted" class="rounded-md border border-green-200 bg-green-50 p-8 text-center">
         <h2 class="text-2xl font-bold text-wf-ok">Jawaban berhasil dikirim</h2>
         <p class="mt-2 text-wf-secondary">Hasil pengerjaan akan diproses oleh sistem.</p>
-        <button type="button" class="mt-6 rounded-xl bg-wf-accent px-6 py-3 font-bold text-white" @click="router.back()">KEMBALI KE LATIHAN</button>
+        <button type="button" class="tombol-kembali mt-6" @click="router.back()">
+          <span aria-hidden="true" class="text-xl leading-none">←</span>
+          KEMBALI KE LATIHAN
+        </button>
       </section>
       <section v-else-if="soal.length" class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_305px]">
         <article class="rounded-md border border-wf-border-subtle bg-wf-card p-6 sm:p-7">
@@ -274,7 +277,10 @@ onBeforeUnmount(() => window.clearInterval(timerId))
             </label>
           </div>
           <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-wf-border-subtle pt-5">
-            <button type="button" :disabled="nomorAktif === 0 || submitting" class="rounded-xl border border-wf-border-subtle px-5 py-3 text-[17px] font-semibold text-wf-secondary disabled:opacity-40" @click="nomorAktif--">← SEBELUMNYA</button>
+            <button type="button" :disabled="nomorAktif === 0 || submitting" class="tombol-kembali disabled:cursor-not-allowed disabled:opacity-40" @click="nomorAktif--">
+              <span aria-hidden="true" class="text-xl leading-none">←</span>
+              SEBELUMNYA
+            </button>
             <button type="button" :disabled="submitting" class="rounded-xl border border-wf-brand-border px-5 py-3 text-[17px] font-semibold text-wf-brand hover:bg-wf-brand-soft disabled:opacity-40" @click="toggleRagu">
               {{ ragu.has(nomorAktif) ? 'HAPUS TANDA RAGU' : 'TANDAI RAGU' }}
             </button>

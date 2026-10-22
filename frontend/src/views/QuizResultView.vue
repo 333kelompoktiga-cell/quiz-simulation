@@ -120,7 +120,13 @@ onMounted(async () => {
           <button type="button" class="rounded-xl bg-wf-brand px-4 py-3 font-semibold text-white hover:bg-wf-accent-hover" @click="router.push({ path: `/kuis/${props.id}/diagnostik`, query: { pengerjaan: route.query.pengerjaan } })">
             BUKA LAPORAN DIAGNOSTIK
           </button>
-          <button type="button" class="rounded-xl border border-wf-accent-light px-4 py-3 font-semibold text-wf-brand hover:bg-wf-brand-soft" @click="router.push('/statistik')">STATISTIK →</button>
+          <button
+            type="button"
+            class="rounded-xl border border-wf-accent-light px-4 py-3 font-semibold text-wf-brand hover:bg-wf-brand-soft"
+            @click="router.push({ path: '/statistik', query: { kuis: props.id, pengerjaan: route.query.pengerjaan } })"
+          >
+            STATISTIK →
+          </button>
         </div>
         <p v-if="errorPembahasan" role="alert" class="mt-3 text-sm text-red-700">{{ errorPembahasan }}</p>
         <section v-if="tampilPembahasan" class="mt-4 flex flex-col gap-4">

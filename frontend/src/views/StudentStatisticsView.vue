@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ambilDaftarBab } from '../services/bab'
 import { getAvatar, getUser, SessionExpiredError } from '../services/auth'
 import StudentHeader from '../components/StudentHeader.vue'
@@ -8,11 +8,25 @@ import logoImage from '../assets/logo-esikap.png'
 import avatarImage from '../assets/icons/avatar.svg'
 
 const router = useRouter()
+const route = useRoute()
 const user = ref(getUser())
 const avatar = ref(getAvatar() || avatarImage)
 const bab = ref([])
 const loading = ref(true)
 const errorMsg = ref('')
+const dapatKembaliKeHasil = computed(() =>
+  typeof route.query.kuis === 'string'
+  && route.query.kuis.length > 0
+  && typeof route.query.pengerjaan === 'string'
+  && route.query.pengerjaan.length > 0)
+
+function kembaliKeHasil() {
+  if (!dapatKembaliKeHasil.value) return
+  router.push({
+    path: `/kuis/${route.query.kuis}/hasil`,
+    query: { pengerjaan: route.query.pengerjaan },
+  })
+}
 
 const fallbackBab = [
   { namaBab: 'Ejaan', nilai: 60, penguasaan: 45 },
@@ -65,7 +79,13 @@ onMounted(async () => {
     <StudentHeader active="statistik" />
 
     <main class="mx-auto max-w-[1200px] px-6 pb-12 pt-8 sm:px-10 lg:px-0">
-      <h1 class="text-[24px] font-bold sm:text-[26px]">Statistik saya</h1>
+      <div class="flex flex-wrap items-center gap-3">
+        <button v-if="dapatKembaliKeHasil" type="button" class="tombol-kembali" @click="kembaliKeHasil">
+          <span aria-hidden="true" class="text-xl leading-none">←</span>
+          KEMBALI KE HASIL KUIS
+        </button>
+        <h1 class="text-[24px] font-bold sm:text-[26px]">Statistik saya</h1>
+      </div>
       <p v-if="errorMsg" role="alert" class="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-wf-no-text">{{ errorMsg }}</p>
       <p v-if="loading" class="mt-6 text-wf-secondary">Memuat statistik...</p>
 
