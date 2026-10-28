@@ -81,7 +81,6 @@ onMounted(async () => {
     <main class="mx-auto max-w-[1200px] px-6 pb-12 pt-8 sm:px-10 lg:px-0">
       <div class="flex flex-wrap items-center gap-3">
         <button v-if="dapatKembaliKeHasil" type="button" class="tombol-kembali" @click="kembaliKeHasil">
-          <span aria-hidden="true" class="text-xl leading-none">←</span>
           KEMBALI KE HASIL KUIS
         </button>
         <h1 class="text-[24px] font-bold sm:text-[26px]">Statistik saya</h1>

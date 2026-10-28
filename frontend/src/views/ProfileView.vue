@@ -6,11 +6,17 @@ import { getAvatar, getUser, keluar } from '../services/auth'
 import logoImage from '../assets/logo-esikap.png'
 import avatarImage from '../assets/icons/avatar.svg'
 import StudentHeader from '../components/StudentHeader.vue'
+import AdminHeader from '../components/AdminHeader.vue'
+import { ROLE } from '../services/roles'
 
 const router = useRouter()
 const user = ref(getUser())
 const avatar = ref(getAvatar() || avatarImage)
 const loggingOut = ref(false)
+
+// Halaman ini dipakai semua role. Admin dan Super Admin tetap melihat navbar
+// mereka sendiri, dan username mereka bukan NIM.
+const mahasiswa = user.value?.role === ROLE.MAHASISWA
 
 const bergabung = ref('-')
 const terakhirMasuk = ref('-')
@@ -41,9 +47,13 @@ async function handleLogout() {
 
 <template>
   <div class="min-h-screen bg-wf-page text-wf-text">
-    <StudentHeader />
+    <StudentHeader v-if="mahasiswa" />
+    <AdminHeader v-else />
 
-    <main class="mx-auto max-w-[1200px] px-6 pb-12 pt-10 sm:px-10 lg:px-0">
+    <main
+      class="pb-12 pt-10"
+      :class="mahasiswa ? 'mx-auto max-w-[1200px] px-6 sm:px-10 lg:px-0' : 'px-4 sm:px-10 lg:px-20'"
+    >
       <h1 class="text-[28px] font-bold sm:text-[30px]">Akun saya</h1>
 
       <div class="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_286px]">
@@ -55,7 +65,7 @@ async function handleLogout() {
               <strong>{{ user?.nama || '-' }}</strong>
             </div>
             <div class="account-row">
-              <span>NIM</span>
+              <span>{{ mahasiswa ? 'NIM' : 'Username' }}</span>
               <strong>{{ user?.username || '-' }}</strong>
             </div>
             <div class="account-row">

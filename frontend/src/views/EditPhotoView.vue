@@ -5,9 +5,12 @@ import { getAvatar, getUser, keluar, saveAvatar } from '../services/auth'
 import logoImage from '../assets/logo-esikap.png'
 import avatarImage from '../assets/icons/avatar.svg'
 import StudentHeader from '../components/StudentHeader.vue'
+import AdminHeader from '../components/AdminHeader.vue'
+import { ROLE } from '../services/roles'
 
 const router = useRouter()
 const user = ref(getUser())
+const mahasiswa = user.value?.role === ROLE.MAHASISWA
 const avatar = ref(getAvatar() || avatarImage)
 const selectedFile = ref(null)
 const inputFile = ref(null)
@@ -70,12 +73,15 @@ async function handleLogout() {
 
 <template>
   <div class="min-h-screen bg-wf-page text-wf-text">
-    <StudentHeader />
+    <StudentHeader v-if="mahasiswa" />
+    <AdminHeader v-else />
 
-    <main class="mx-auto max-w-[1200px] px-6 pb-12 pt-8 sm:px-10 lg:px-0">
+    <main
+      class="pb-12 pt-8"
+      :class="mahasiswa ? 'mx-auto max-w-[1200px] px-6 sm:px-10 lg:px-0' : 'px-4 sm:px-10 lg:px-20'"
+    >
       <div class="flex flex-wrap items-center gap-3">
         <RouterLink to="/profil" class="tombol-kembali">
-          <span aria-hidden="true" class="text-xl leading-none">←</span>
           KEMBALI KE AKUN SAYA
         </RouterLink>
         <span class="text-wf-muted" aria-hidden="true">/</span>

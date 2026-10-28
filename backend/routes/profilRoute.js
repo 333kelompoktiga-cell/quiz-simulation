@@ -7,11 +7,14 @@ import { uploadFoto } from '../middleware/uploadFoto.js';
 
 const router = express.Router();
 
-// Semua endpoint di sini hanya untuk mahasiswa yang sedang login
-router.use(verifyLoggedIn, verifyMahasiswa);
+router.use(verifyLoggedIn);
 
-router.put('/foto', uploadFoto, updateFotoProfil);
-router.delete('/foto', deleteFotoProfil);
+// Data akun (bergabung, terakhir masuk) dibaca halaman Akun saya, yang juga
+// dipakai Admin dan Super Admin. Jadi endpoint ini terbuka untuk semua role.
 router.get('/', getProfilSaya);
+
+// Foto profil tetap hanya untuk mahasiswa
+router.put('/foto', verifyMahasiswa, uploadFoto, updateFotoProfil);
+router.delete('/foto', verifyMahasiswa, deleteFotoProfil);
 
 export default router;

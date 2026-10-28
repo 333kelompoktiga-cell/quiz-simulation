@@ -293,7 +293,7 @@ onMounted(async () => {
                     <td class="py-3.5 pr-4 text-[17px] text-wf-secondary">{{ m.jumlahPercobaan }}x</td>
                     <td class="py-3.5 text-right">
                       <RouterLink :to="`/rekap/pengerjaan/${m.idPengerjaan}`" class="text-[15px] font-semibold text-wf-brand hover:underline">
-                        Detail ›
+                        Detail
                       </RouterLink>
                     </td>
                   </tr>

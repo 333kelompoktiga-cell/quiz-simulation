@@ -193,7 +193,7 @@ onMounted(async () => {
             class="mt-5 w-full rounded-xl border border-wf-brand-border px-4 py-3 text-[18px] font-bold text-wf-brand transition hover:bg-wf-brand-soft focus:outline-none focus:ring-2 focus:ring-wf-brand/30"
             @click="bukaBab(item)"
           >
-            BUKA BAB <span aria-hidden="true" class="ml-1 text-[22px] leading-none">→</span>
+            BUKA BAB
           </button>
         </article>
       </section>

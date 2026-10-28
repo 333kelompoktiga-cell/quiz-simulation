@@ -249,7 +249,6 @@ onBeforeUnmount(() => window.clearInterval(timerId))
         <h2 class="text-2xl font-bold text-wf-ok">Jawaban berhasil dikirim</h2>
         <p class="mt-2 text-wf-secondary">Hasil pengerjaan akan diproses oleh sistem.</p>
         <button type="button" class="tombol-kembali mt-6" @click="router.back()">
-          <span aria-hidden="true" class="text-xl leading-none">←</span>
           KEMBALI KE LATIHAN
         </button>
       </section>
@@ -278,13 +277,12 @@ onBeforeUnmount(() => window.clearInterval(timerId))
           </div>
           <div class="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-wf-border-subtle pt-5">
             <button type="button" :disabled="nomorAktif === 0 || submitting" class="tombol-kembali disabled:cursor-not-allowed disabled:opacity-40" @click="nomorAktif--">
-              <span aria-hidden="true" class="text-xl leading-none">←</span>
               SEBELUMNYA
             </button>
             <button type="button" :disabled="submitting" class="rounded-xl border border-wf-brand-border px-5 py-3 text-[17px] font-semibold text-wf-brand hover:bg-wf-brand-soft disabled:opacity-40" @click="toggleRagu">
               {{ ragu.has(nomorAktif) ? 'HAPUS TANDA RAGU' : 'TANDAI RAGU' }}
             </button>
-            <button type="button" :disabled="nomorAktif === soal.length - 1 || submitting" class="rounded-xl border border-wf-brand-border px-5 py-3 text-[17px] font-semibold text-wf-brand disabled:opacity-40" @click="nomorAktif++">SELANJUTNYA →</button>
+            <button type="button" :disabled="nomorAktif === soal.length - 1 || submitting" class="rounded-xl border border-wf-brand-border px-5 py-3 text-[17px] font-semibold text-wf-brand disabled:opacity-40" @click="nomorAktif++">SELANJUTNYA</button>
           </div>
         </article>
 
