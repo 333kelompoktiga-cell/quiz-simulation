@@ -36,6 +36,7 @@ const originDiizinkan = [
   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
   process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null,
 ]
+  .filter(Boolean)
   .map((o) => o.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
