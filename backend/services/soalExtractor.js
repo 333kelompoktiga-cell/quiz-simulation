@@ -14,7 +14,6 @@
 //   "Tingkat Kesulitan" (Mudah/Sedang/Sulit) opsional di semua format.
 //
 // Format lama yang diawali "Nomor Soal N" tetap didukung.
-import { PDFParse } from 'pdf-parse';
 import { supabaseAdmin } from '../config/db.js';
 
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -206,6 +205,7 @@ export function parseSoal(fullText) {
 }
 
 export async function extractTextFromBuffer(buffer, startPage, endPage) {
+  const { PDFParse } = await import('pdf-parse');
   const parser = new PDFParse({ data: buffer });
 
   try {

@@ -1,3 +1,4 @@
+import './config/polyfills.js';
 import { supabase, supabaseAdmin } from './config/db.js';
 import authRoute from './routes/authRoute.js';
 import accountRoute from './routes/accountRoute.js';
