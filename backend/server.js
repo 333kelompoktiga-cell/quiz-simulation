@@ -32,6 +32,8 @@ if (process.env.TRUST_PROXY) {
 const originDiizinkan = [
   ...(process.env.FRONTEND_URLS || 'http://localhost:5173').split(','),
   process.env.BACKEND_URL || 'http://localhost:3000',
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+  process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null,
 ]
   .map((o) => o.trim().replace(/\/$/, ''))
   .filter(Boolean);

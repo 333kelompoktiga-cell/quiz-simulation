@@ -163,7 +163,7 @@ export async function importSoalPdf({ file, idKuis, startPage, endPage, upload =
   formData.append('endPage', String(endPage))
   formData.append('upload', String(upload))
 
-  const res = await fetch(`${import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api'}/soal/import-pdf`, {
+  const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/soal/import-pdf`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     body: formData, // jangan set Content-Type manual
