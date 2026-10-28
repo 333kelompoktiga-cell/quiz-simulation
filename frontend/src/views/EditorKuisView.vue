@@ -35,6 +35,9 @@ const router = useRouter()
 const MAKS_OPSI = 6
 const MIN_OPSI = 2
 
+// Template dokumen soal (Google Docs) untuk tab Dokumen, dibuka di tab baru.
+const TEMPLATE_SOAL_URL = 'https://docs.google.com/document/d/13dNI81pmQpRn92Dh8pAzdO_tHg7cyWenxu30-0bTR-A/edit?pli=1&tab=t.0'
+
 // Aturan acak soal, sama dengan backend/utils/acakSoal.js. Urutan soal selalu diacak;
 // "acak soal" (menampilkan sebagian) hanya bisa dipakai kalau ada minimal 20 soal,
 // minimal 10 ditampilkan, dan selalu ada minimal 10 soal cadangan.
@@ -783,14 +786,34 @@ async function simpanDokumen() {
         v-else
         class="bg-wf-card border border-wf-border-subtle rounded-md shadow-sm p-6 flex flex-col gap-6"
       >
-        <div class="flex flex-col gap-1">
-          <h2 class="text-[22px] leading-[30px] font-semibold">Unggah dokumen kuis</h2>
-          <a href="https://docs.google.com/document/d/13dNI81pmQpRn92Dh8pAzdO_tHg7cyWenxu30-0bTR-A/edit?pli=1&tab=t.0" target="_blank" rel="noopener noreferrer" class="text-wf-brand hover:text-wf-brand-hover focus:outline-none focus:ring-2 focus:ring-wf-brand" >
-            Template Soal
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div class="flex-1 min-w-[260px] flex flex-col gap-1">
+            <h2 class="text-[22px] leading-[30px] font-semibold">Unggah dokumen kuis</h2>
+            <p class="text-[17px] leading-6 text-wf-secondary">
+              Lampirkan PDF berisi soal, kunci jawaban, dan pembahasan. Soal diekstrak otomatis dari rentang halaman yang dipilih.
+              Pakai template soal supaya isinya terbaca dengan benar.
+            </p>
+          </div>
+          <a :href="TEMPLATE_SOAL_URL" target="_blank" rel="noopener noreferrer" class="tombol-aksi shrink-0">
+            <!-- Ikon external-link dari Lucide, warnanya mengikuti teks -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="size-4 shrink-0"
+              aria-hidden="true"
+            >
+              <path d="M15 3h6v6" />
+              <path d="M10 14 21 3" />
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+            </svg>
+            Template soal
+            <span class="sr-only">(buka di tab baru)</span>
           </a>
-          <p class="text-[17px] leading-6 text-wf-secondary">
-            Lampirkan PDF berisi soal, kunci jawaban, dan pembahasan. Soal diekstrak otomatis dari rentang halaman yang dipilih.
-          </p>
         </div>
 
         <p v-if="errorMsg" role="alert" class="rounded-md bg-red-50 border border-wf-no-border px-4 py-3 text-[15px] text-wf-no-text">
