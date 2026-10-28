@@ -1,6 +1,6 @@
 import { ROLE } from './roles'
 
-const API_URL = import.meta.env.VITE_API_URL
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 if (!API_URL) {
   console.error('VITE_API_URL belum diisi. Salin frontend/.env.example jadi frontend/.env lalu jalankan ulang `npm run dev`.')
