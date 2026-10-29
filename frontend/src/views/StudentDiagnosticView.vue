@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ambilHasilPengerjaan, ambilKuis } from '../services/kuis'
 import { getAvatar, getUser, SessionExpiredError } from '../services/auth'
+import avatarImage from '../assets/icons/avatar.svg'
 import StudentHeader from '../components/StudentHeader.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
@@ -61,7 +62,6 @@ onMounted(async () => {
 
     <main class="mx-auto max-w-[900px] px-6 pb-12 pt-8 sm:px-0">
       <button type="button" class="tombol-kembali" @click="kembaliKeHasil">
-        <span aria-hidden="true" class="text-xl leading-none">←</span>
         KEMBALI KE HASIL KUIS
       </button>
       <p v-if="loading" class="mt-7 text-wf-secondary">Menyusun laporan diagnostik...</p>
@@ -110,7 +110,6 @@ onMounted(async () => {
         <div class="mt-6 flex flex-wrap gap-3">
           <RouterLink to="/peta-belajar" class="rounded-xl bg-wf-accent px-5 py-3 font-semibold text-white hover:bg-wf-accent-hover">BUKA LEARNING ROADMAP</RouterLink>
           <button type="button" class="tombol-kembali" @click="kembaliKeHasil">
-            <span aria-hidden="true" class="text-xl leading-none">←</span>
             KEMBALI KE HASIL
           </button>
         </div>

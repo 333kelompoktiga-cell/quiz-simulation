@@ -628,7 +628,7 @@ async function simpanDokumen() {
                 :disabled="indeksAktif === 0"
                 class="shrink-0 whitespace-nowrap rounded-xl border px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 text-[14px] sm:text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] disabled:bg-wf-muted-surface disabled:border-wf-border-subtle disabled:text-wf-muted bg-wf-card border-wf-brand-border text-wf-brand"
               >
-                ← SEBELUMNYA
+                SEBELUMNYA
               </button>
               <p class="flex-1 min-w-0 whitespace-nowrap text-center text-[14px] sm:text-[16px] lg:text-[19px] leading-[26px] text-wf-secondary">
                 <span class="sm:hidden">{{ indeksAktif + 1 }}/{{ daftarSoal.length }}</span>
@@ -639,7 +639,7 @@ async function simpanDokumen() {
                 @click="selanjutnya"
                 class="shrink-0 whitespace-nowrap rounded-xl bg-wf-card border border-wf-brand-border px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 text-[14px] sm:text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] text-wf-brand"
               >
-                {{ indeksAktif === daftarSoal.length - 1 ? '+ SOAL BARU' : 'SELANJUTNYA →' }}
+                {{ indeksAktif === daftarSoal.length - 1 ? '+ SOAL BARU' : 'SELANJUTNYA' }}
               </button>
             </div>
 

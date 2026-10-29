@@ -100,7 +100,6 @@ onMounted(async () => {
     <main class="mx-auto max-w-[1000px] px-6 pb-12 pt-9 sm:px-10 lg:px-0">
       <div class="flex flex-wrap items-center gap-3">
         <RouterLink to="/dashboard" class="tombol-kembali">
-          <span aria-hidden="true" class="text-xl leading-none">←</span>
           <span>KEMBALI KE LATIHAN</span>
         </RouterLink>
         <span class="text-wf-muted" aria-hidden="true">/</span>

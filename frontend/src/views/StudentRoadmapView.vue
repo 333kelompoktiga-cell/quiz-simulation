@@ -62,7 +62,7 @@ onMounted(() => {
     <main class="mx-auto max-w-[900px] px-6 pb-16 pt-8 sm:px-10 lg:px-0">
       <!-- Breadcrumb -->
       <nav aria-label="Breadcrumb" class="font-mono text-[14px] uppercase tracking-wider text-wf-secondary sm:text-[15px]">
-        <RouterLink to="/peta-belajar" class="font-semibold text-wf-brand hover:underline">← Peta Belajar</RouterLink>
+        <RouterLink to="/peta-belajar" class="font-semibold text-wf-brand hover:underline">Peta Belajar</RouterLink>
         <span class="mx-2 text-wf-border">/</span>
         <span class="text-wf-text font-medium">{{ namaBab }}</span>
       </nav>
@@ -239,7 +239,7 @@ onMounted(() => {
           to="/peta-belajar"
           class="rounded-xl border border-wf-border-subtle bg-wf-card px-5 py-3 text-sm font-bold text-wf-secondary hover:border-wf-brand hover:text-wf-brand shadow-sm transition"
         >
-          ← KEMBALI KE PETA BELAJAR
+          KEMBALI KE PETA BELAJAR
         </RouterLink>
 
         <button

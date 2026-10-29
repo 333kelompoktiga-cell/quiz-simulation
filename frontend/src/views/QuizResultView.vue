@@ -125,7 +125,7 @@ onMounted(async () => {
             class="rounded-xl border border-wf-accent-light px-4 py-3 font-semibold text-wf-brand hover:bg-wf-brand-soft"
             @click="router.push({ path: '/statistik', query: { kuis: props.id, pengerjaan: route.query.pengerjaan } })"
           >
-            STATISTIK →
+            STATISTIK
           </button>
         </div>
         <p v-if="errorPembahasan" role="alert" class="mt-3 text-sm text-red-700">{{ errorPembahasan }}</p>
@@ -145,7 +145,7 @@ onMounted(async () => {
         </section>
         <div class="mt-3 flex flex-wrap justify-between gap-3">
           <button type="button" class="rounded-xl border border-wf-brand-border px-4 py-3 font-semibold text-wf-brand hover:bg-wf-brand-soft" @click="ulangi">ULANGI BAB INI</button>
-          <RouterLink to="/dashboard" class="rounded-xl bg-wf-accent px-5 py-3 font-semibold text-white hover:bg-wf-accent-hover">BAB BERIKUTNYA: TANDA BACA →</RouterLink>
+          <RouterLink to="/dashboard" class="rounded-xl bg-wf-accent px-5 py-3 font-semibold text-white hover:bg-wf-accent-hover">BAB BERIKUTNYA: TANDA BACA</RouterLink>
         </div>
       </template>
     </main>
