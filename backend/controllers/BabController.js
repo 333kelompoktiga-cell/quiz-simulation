@@ -107,7 +107,7 @@ export const createBab = async (req, res) => {
       );
     }
 
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from('Bab')
       .insert({
         namaBab: namaBab.trim(),
@@ -121,6 +121,24 @@ export const createBab = async (req, res) => {
     if (error) {
       if (error.code === '23505') return tanganiUniqueViolation(res, error, namaBab.trim(), nomorUrut);
       return res.status(500).json(errorResponse({ message: error.message || 'Gagal membuat bab.' }));
+    }
+
+    // Jika di database Supabase masih ada trigger BEFORE INSERT yang menimpa urutanBab
+    // dengan MAX(urutanBab) + 1, paksa simpan nomorUrut inputan admin lewat UPDATE.
+    if (data && data.urutanBab !== nomorUrut) {
+      const { data: updatedData, error: updateError } = await supabaseAdmin
+        .from('Bab')
+        .update({ urutanBab: nomorUrut })
+        .eq('idBab', data.idBab)
+        .select(BAB_COLUMNS)
+        .single();
+
+      if (updateError) {
+        await supabaseAdmin.from('Bab').delete().eq('idBab', data.idBab);
+        if (updateError.code === '23505') return tanganiUniqueViolation(res, updateError, namaBab.trim(), nomorUrut);
+        return res.status(500).json(errorResponse({ message: updateError.message || 'Gagal menyimpan nomor urut bab.' }));
+      }
+      data = updatedData;
     }
 
     return res.status(201).json(successResponse({ message: 'Bab berhasil dibuat.', data }));
