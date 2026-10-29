@@ -33,7 +33,11 @@ function statusKelas(status) {
 }
 
 function ulangi(item) {
-  if (!item.tersedia) {
+  if (item.bisaMengerjakan === false) {
+    notice.value = item.sisaPercobaan === 0 ? 'Jatah percobaan kuis Anda sudah habis.' : 'Kuis belum bisa dikerjakan.'
+    return
+  }
+  if (!item.tersedia && !item.adaPercobaanAktif) {
     notice.value = `Kuis "${item.judul}" belum dibuka oleh dosen.`
     return
   }
@@ -140,6 +144,7 @@ onMounted(async () => {
                   {{ item.jumlahSoalTampil ?? item.jumlahSoal ?? 0 }} soal · bobot 100 poin · durasi {{ item.durasi ?? '—' }} menit
                 </p>
               </div>
+              <p class="text-sm text-wf-secondary">Sisa percobaan: {{ item.sisaPercobaan ?? item.maksPercobaan }} dari {{ item.maksPercobaan }}<span v-if="item.adaPercobaanAktif"> ? Ada pengerjaan berlangsung</span></p>
               <div class="flex items-center gap-5">
                 <div class="text-right">
                   <span class="rounded-md px-2 py-1 text-[16px] font-semibold" :class="statusKelas(statusKuis(item))">
@@ -163,10 +168,10 @@ onMounted(async () => {
                   <button
                     type="button"
                     class="rounded-xl border border-wf-brand-border px-5 py-4 text-[18px] font-semibold text-wf-brand hover:bg-wf-brand-soft disabled:cursor-not-allowed disabled:opacity-50"
-                    :disabled="!item.tersedia"
+                    :disabled="item.bisaMengerjakan === false || (!item.tersedia && !item.adaPercobaanAktif)"
                     @click="ulangi(item)"
                   >
-                    {{ item.statusBelajar === 'Selesai' ? 'ULANGI' : 'MULAI' }}
+                    {{ item.adaPercobaanAktif ? 'LANJUTKAN' : item.sisaPercobaan === 0 ? 'JATAH HABIS' : item.statusBelajar === 'Selesai' ? 'ULANGI' : 'MULAI' }}
                   </button>
                 </div>
               </div>
