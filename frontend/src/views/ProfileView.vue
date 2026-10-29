@@ -89,7 +89,7 @@ async function handleLogout() {
 
         <aside class="flex min-h-[260px] flex-col items-center justify-center rounded-md border border-wf-border-subtle bg-wf-card px-6 py-7 text-center">
           <img :src="avatar" alt="" class="size-20 rounded-full object-cover" />
-          <RouterLink to="/profil/edit-foto" class="mt-4 font-mono text-[16px] tracking-[0.12em] text-wf-secondary hover:text-wf-brand">
+          <RouterLink to="/profil/edit-foto" class="tombol-aksi mt-4">
             Edit Foto
           </RouterLink>
           <h2 class="mt-4 text-[20px] font-bold">{{ user?.nama || 'Mahasiswa' }}</h2>
