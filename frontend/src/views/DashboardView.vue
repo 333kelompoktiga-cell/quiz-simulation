@@ -3,21 +3,15 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ambilDaftarBab } from '../services/bab'
 import { ambilDaftarKuis } from '../services/kuis'
-import { getAvatar, getUser, keluar, SessionExpiredError } from '../services/auth'
+import { SessionExpiredError } from '../services/auth'
 import StudentHeader from '../components/StudentHeader.vue'
-import logoImage from '../assets/logo-esikap.png'
-import avatarImage from '../assets/icons/avatar.svg'
 
 const router = useRouter()
-const user = ref(getUser())
-const avatar = ref(getAvatar() || avatarImage)
 const bab = ref([])
 const kuis = ref([])
 const loading = ref(true)
 const errorMsg = ref('')
 const notice = ref('')
-const loggingOut = ref(false)
-const profileOpen = ref(false)
 const kataPencarian = ref('')
 const filterAktif = ref('semua')
 
@@ -76,13 +70,6 @@ function bukaBab(item) {
     return
   }
   notice.value = `Latihan ${item.namaBab} belum memiliki ID bab dari server.`
-}
-
-async function handleLogout() {
-  loggingOut.value = true
-  await keluar()
-  loggingOut.value = false
-  router.push('/')
 }
 
 onMounted(async () => {
