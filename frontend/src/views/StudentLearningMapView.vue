@@ -107,7 +107,7 @@ onMounted(() => {
             class="flex size-8 items-center justify-center rounded-full border-2 text-sm font-bold"
             :class="item.status === 'terkunci' ? 'border-gray-300 text-gray-400' : 'border-wf-brand text-wf-brand'"
           >
-            {{ index + 1 }}
+            {{ item.urutanBab ?? index + 1 }}
           </div>
 
           <!-- Keterangan Bab -->

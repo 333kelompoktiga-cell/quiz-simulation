@@ -135,13 +135,18 @@ export const mulaiPengerjaan = async (req, res) => {
 
     const { data: kuisDb, error: kuisError } = await supabaseAdmin
       .from('Kuis')
-      .select('idKuis, judul, durasi, pin, acakSoal, jumlahTampil')
+      .select('idKuis, judul, durasi, pin, acakSoal, jumlahTampil, bab:Bab(namaBab, urutanBab)')
       .eq('idKuis', idKuis)
       .maybeSingle();
     if (kuisError) return dbError(res, kuisError, 'Gagal memeriksa kuis.');
     if (!kuisDb) return res.status(404).json(errorResponse({ message: 'Kuis tidak ditemukan.' }));
     // PIN dipisah supaya tidak ikut terkirim ke mahasiswa di respons
-    const { pin: pinKuis, acakSoal, jumlahTampil, ...kuis } = kuisDb;
+    const { pin: pinKuis, acakSoal, jumlahTampil, bab, ...kuisFields } = kuisDb;
+    const kuis = {
+      ...kuisFields,
+      namaBab: bab?.namaBab ?? null,
+      urutanBab: bab?.urutanBab ?? null,
+    };
 
     const { data: questions, error: questionsError } = await getQuizQuestions(idKuis);
     if (questionsError) return dbError(res, questionsError, 'Gagal memuat soal kuis.');

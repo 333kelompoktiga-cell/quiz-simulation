@@ -8,9 +8,21 @@ const BAB_COLUMNS = 'idBab, namaBab, deskripsi, urutanBab, dibuatOleh, tanggalDi
 // Minimal 1 — tidak ada bab nomor 0, meski dikirim paksa lewat API.
 const urutanValid = (nilai) => Number.isInteger(nilai) && nilai >= 1;
 
-// 23505 = unique violation pada idx_bab_nama_unik (nama bab unik, tidak peka huruf besar/kecil)
-const namaBabDobel = (res, namaBab) =>
-  res.status(409).json(errorResponse({ message: `Bab dengan nama "${namaBab}" sudah ada.` }));
+// 23505 = unique violation — bisa terjadi pada:
+//   - idx_bab_nama_unik        → nama bab unik (tidak peka huruf besar/kecil)
+//   - idx_bab_urutan_per_admin → urutan bab unik per admin (dibuatOleh + urutanBab)
+// Fungsi ini memeriksa pesan error untuk membedakan keduanya.
+const tanganiUniqueViolation = (res, error, namaBab, urutanBab) => {
+  const msg = `${error.message || ''} ${error.details || ''}`;
+  if (msg.includes('urutan') || msg.includes('urutanBab') || msg.includes('idx_bab_urutan_per_admin')) {
+    return res.status(409).json(
+      errorResponse({ message: `Nomor urut bab ${urutanBab} sudah Anda gunakan. Silakan gunakan nomor urut lain.` }),
+    );
+  }
+  return res.status(409).json(
+    errorResponse({ message: `Bab dengan nama "${namaBab}" sudah ada.` }),
+  );
+};
 
 // Menampilkan semua bab — bisa diakses semua role yang sudah login (guru, superadmin, mahasiswa).
 // Diurutkan dari bab pertama, bukan dari yang terbaru dibuat.
@@ -55,6 +67,8 @@ export const getBabById = async (req, res) => {
 
 // Hanya admin (guru) yang bisa membuat bab. dibuatOleh hanya catatan pembuat:
 // bab dipakai bersama, semua dosen bisa mengisinya dengan kuis masing-masing.
+// Nomor urut bab WAJIB diisi oleh admin (tidak lagi auto-increment).
+// Nomor urut bersifat UNIQUE per admin — admin berbeda boleh memakai nomor yang sama.
 export const createBab = async (req, res) => {
   try {
     const { namaBab, deskripsi, urutanBab } = req.body;
@@ -63,8 +77,34 @@ export const createBab = async (req, res) => {
       return res.status(400).json(errorResponse({ message: 'Nama bab wajib diisi.' }));
     }
 
-    if (urutanBab !== undefined && !urutanValid(urutanBab)) {
+    if (urutanBab === undefined || urutanBab === null || urutanBab === '') {
+      return res.status(400).json(errorResponse({ message: 'Nomor urut bab wajib diisi.' }));
+    }
+
+    const nomorUrut = typeof urutanBab === 'string' && urutanBab.trim() !== '' ? Number(urutanBab) : urutanBab;
+    if (!urutanValid(nomorUrut)) {
       return res.status(400).json(errorResponse({ message: 'Urutan bab harus berupa angka bulat minimal 1.' }));
+    }
+
+    // Cek duplikat nomor urut khusus untuk admin ini sebelum insert
+    const adminId = req.currentUser.id;
+    const { data: existing, error: checkError } = await supabaseAdmin
+      .from('Bab')
+      .select('idBab, namaBab')
+      .eq('dibuatOleh', adminId)
+      .eq('urutanBab', nomorUrut)
+      .maybeSingle();
+
+    if (checkError) {
+      return res.status(500).json(errorResponse({ message: checkError.message || 'Gagal memeriksa nomor urut bab.' }));
+    }
+
+    if (existing) {
+      return res.status(409).json(
+        errorResponse({
+          message: `Nomor urut bab ${nomorUrut} sudah Anda gunakan pada bab "${existing.namaBab}". Silakan gunakan nomor urut lain.`,
+        }),
+      );
     }
 
     const { data, error } = await supabaseAdmin
@@ -72,14 +112,14 @@ export const createBab = async (req, res) => {
       .insert({
         namaBab: namaBab.trim(),
         deskripsi: deskripsi ?? null,
-        urutanBab: urutanBab ?? 1,
-        dibuatOleh: req.currentUser.id,
+        urutanBab: nomorUrut,
+        dibuatOleh: adminId,
       })
       .select(BAB_COLUMNS)
       .single();
 
     if (error) {
-      if (error.code === '23505') return namaBabDobel(res, namaBab.trim());
+      if (error.code === '23505') return tanganiUniqueViolation(res, error, namaBab.trim(), nomorUrut);
       return res.status(500).json(errorResponse({ message: error.message || 'Gagal membuat bab.' }));
     }
 
@@ -108,10 +148,51 @@ export const updateBab = async (req, res) => {
     }
     if (deskripsi !== undefined) updatePayload.deskripsi = deskripsi;
     if (urutanBab !== undefined) {
-      if (!urutanValid(urutanBab)) {
+      if (urutanBab === null || urutanBab === '') {
+        return res.status(400).json(errorResponse({ message: 'Nomor urut bab wajib diisi.' }));
+      }
+      const nomorUrut = typeof urutanBab === 'string' && urutanBab.trim() !== '' ? Number(urutanBab) : urutanBab;
+      if (!urutanValid(nomorUrut)) {
         return res.status(400).json(errorResponse({ message: 'Urutan bab harus berupa angka bulat minimal 1.' }));
       }
-      updatePayload.urutanBab = urutanBab;
+
+      // Cek duplikat nomor urut untuk admin pembuat bab ini (kecuali bab yang sedang diedit)
+      const { data: babIni, error: findError } = await supabaseAdmin
+        .from('Bab')
+        .select('idBab, dibuatOleh')
+        .eq('idBab', id)
+        .maybeSingle();
+
+      if (findError) {
+        return res.status(500).json(errorResponse({ message: findError.message || 'Gagal memeriksa bab.' }));
+      }
+      if (!babIni) {
+        return res.status(404).json(errorResponse({ message: 'Bab tidak ditemukan.' }));
+      }
+
+      const pemilikId = babIni.dibuatOleh ?? req.currentUser.id;
+      const { data: existing, error: checkError } = await supabaseAdmin
+        .from('Bab')
+        .select('idBab, namaBab')
+        .eq('dibuatOleh', pemilikId)
+        .eq('urutanBab', nomorUrut)
+        .neq('idBab', id)
+        .maybeSingle();
+
+      if (checkError) {
+        return res.status(500).json(errorResponse({ message: checkError.message || 'Gagal memeriksa nomor urut bab.' }));
+      }
+
+      if (existing) {
+        const subjek = pemilikId === req.currentUser.id ? 'Anda gunakan' : 'digunakan oleh pembuat bab ini';
+        return res.status(409).json(
+          errorResponse({
+            message: `Nomor urut bab ${nomorUrut} sudah ${subjek} pada bab "${existing.namaBab}". Silakan gunakan nomor urut lain.`,
+          }),
+        );
+      }
+
+      updatePayload.urutanBab = nomorUrut;
     }
 
     const { data, error } = await supabaseAdmin
@@ -122,7 +203,7 @@ export const updateBab = async (req, res) => {
       .maybeSingle();
 
     if (error) {
-      if (error.code === '23505') return namaBabDobel(res, updatePayload.namaBab);
+      if (error.code === '23505') return tanganiUniqueViolation(res, error, updatePayload.namaBab, urutanBab);
       return res.status(500).json(errorResponse({ message: error.message || 'Gagal memperbarui bab.' }));
     }
 

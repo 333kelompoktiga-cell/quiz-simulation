@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import AdminHeader from '../components/AdminHeader.vue'
 import TombolKembali from '../components/TombolKembali.vue'
 import { setNotice, SessionExpiredError } from '../services/auth'
-import { ambilBab, ambilDaftarBab, buatBab, ubahBab } from '../services/bab'
+import { ambilBab, buatBab, ubahBab } from '../services/bab'
 import pencilIcon from '../assets/icons/pencil.svg'
 
 // Figma "Tambah bab - Dokumen". Satu halaman untuk dua keperluan:
@@ -15,7 +15,9 @@ const props = defineProps({ id: { type: String, default: null } })
 const router = useRouter()
 const modeEdit = computed(() => Boolean(props.id))
 
-const form = ref({ namaBab: '', urutanBab: 1, deskripsi: '' })
+// Nomor urut bab diisi manual oleh admin (tidak auto-increment).
+// Default kosong (null) agar admin sadar harus mengisi sendiri.
+const form = ref({ namaBab: '', urutanBab: null, deskripsi: '' })
 const memuat = ref(true)
 // Kalau data bab gagal dimuat, form disembunyikan supaya isian kosong tidak
 // ikut tersimpan menimpa bab yang ada.
@@ -33,11 +35,8 @@ onMounted(async () => {
     if (modeEdit.value) {
       const bab = await ambilBab(props.id)
       form.value = { namaBab: bab.namaBab, urutanBab: bab.urutanBab, deskripsi: bab.deskripsi ?? '' }
-    } else {
-      // Bab baru otomatis ditaruh paling akhir.
-      const daftar = await ambilDaftarBab()
-      form.value.urutanBab = Math.max(0, ...daftar.map((b) => b.urutanBab)) + 1
     }
+    // Mode tambah: biarkan nomor urut kosong, admin isi sendiri.
   } catch (err) {
     gagalMuat.value = modeEdit.value
     tanganiError(err)
@@ -49,18 +48,27 @@ onMounted(async () => {
 async function simpan() {
   errorMsg.value = ''
   const f = form.value
+
   if (!f.namaBab.trim()) {
     errorMsg.value = 'Judul bab wajib diisi.'
     return
   }
+
+  // Nomor bab wajib diisi oleh admin
+  if (f.urutanBab === null || f.urutanBab === '' || f.urutanBab === undefined) {
+    errorMsg.value = 'Nomor bab wajib diisi.'
+    return
+  }
+
+  const urutan = Number(f.urutanBab)
   // Aturan yang sama dengan urutanValid() di BabController: minimal 1.
-  if (!Number.isInteger(f.urutanBab) || f.urutanBab < 1) {
+  if (!Number.isInteger(urutan) || urutan < 1) {
     errorMsg.value = 'Nomor bab harus angka bulat minimal 1.'
     return
   }
 
   menyimpan.value = true
-  const data = { namaBab: f.namaBab.trim(), urutanBab: f.urutanBab, deskripsi: f.deskripsi.trim() || null }
+  const data = { namaBab: f.namaBab.trim(), urutanBab: urutan, deskripsi: f.deskripsi.trim() || null }
   try {
     const hasil = modeEdit.value ? await ubahBab(props.id, data) : await buatBab(data)
     setNotice(`Bab "${hasil.namaBab}" berhasil ${modeEdit.value ? 'diperbarui' : 'dibuat'}.`)
@@ -129,14 +137,16 @@ async function simpan() {
             />
           </label>
           <label class="flex flex-col gap-2 w-full sm:w-[360px]">
-            <span class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">NOMOR BAB</span>
+            <span class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">NOMOR BAB <span class="text-red-500">*</span></span>
             <input
               v-model.number="form.urutanBab"
               type="number"
               min="1"
               step="1"
-              class="bg-wf-card border border-wf-border rounded-md p-4 text-[17px] leading-6 focus:outline-none focus:ring-2 focus:ring-wf-brand"
+              placeholder="mis. 1"
+              class="bg-wf-card border border-wf-border rounded-md p-4 text-[17px] leading-6 placeholder:text-wf-muted focus:outline-none focus:ring-2 focus:ring-wf-brand"
             />
+            <span class="text-[13px] text-wf-muted">Nomor bab harus unik untuk Anda. Admin lain boleh memakai nomor yang sama.</span>
           </label>
         </div>
 

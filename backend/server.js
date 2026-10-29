@@ -93,10 +93,10 @@ const NETWORK_IP = '192.168.100.56';
 
 if (!process.env.VERCEL) {
   app.listen(PORT, '0.0.0.0', () => {
-  console.log('Server eKuis Backend berjalan di:');
-  console.log(`- Local: http://localhost:${PORT}`);
-  console.log(`- Network/HP: http://${NETWORK_IP}:${PORT}`);
-});
+    console.log('Server eKuis Backend berjalan di:');
+    console.log(`- Local: http://localhost:${PORT}`);
+    console.log(`- Network/HP: http://${NETWORK_IP}:${PORT}`);
+  });
 }
 
 export default app;

@@ -219,7 +219,7 @@ onBeforeUnmount(() => window.clearInterval(timerId))
     <header class="border-b border-wf-border bg-wf-card">
       <div class="mx-auto flex max-w-[1140px] items-center justify-between gap-5 px-6 py-5 sm:px-10">
         <div>
-          <p class="font-semibold uppercase tracking-[0.08em] text-wf-secondary">Bahasa Indonesia · Bab 1</p>
+          <p class="font-semibold uppercase tracking-[0.08em] text-wf-secondary">Bahasa Indonesia · Bab {{ kuis?.urutanBab ?? 1 }}</p>
           <h1 class="mt-2 text-[21px] font-bold">{{ kuis?.judul || 'Kuis' }}</h1>
         </div>
         <div class="flex items-center gap-5">

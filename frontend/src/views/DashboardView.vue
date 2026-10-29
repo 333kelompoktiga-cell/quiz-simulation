@@ -158,7 +158,7 @@ onMounted(async () => {
         >
           <div class="flex items-start justify-between gap-4">
             <span class="font-mono text-[13px] uppercase tracking-[0.12em] text-wf-secondary">
-              Bab {{ daftarBab.indexOf(item) + 1 }}
+              Bab {{ item.urutanBab ?? daftarBab.indexOf(item) + 1 }}
             </span>
             <span class="rounded-md px-2 py-1 text-[14px] font-semibold leading-5" :class="statusBab(item).kelas">
               {{ statusBab(item).label }}

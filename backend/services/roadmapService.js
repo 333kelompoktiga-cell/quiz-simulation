@@ -285,6 +285,7 @@ export async function getAllRoadmapsForUser(idUser) {
     return {
       idBab: bab.idBab,
       namaBab: bab.namaBab,
+      urutanBab: bab.urutanBab,
       deskripsi: bab.deskripsi,
       status, // 'terkunci' | 'roadmap' | 'sempurna'
       ringkasan,

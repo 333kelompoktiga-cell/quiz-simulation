@@ -64,7 +64,8 @@ const daftarPembuat = computed(() => [
 function formatRingkasan() {
   const jumlah = daftarKuis.value.length
   const soal = daftarKuis.value.reduce((sum, item) => sum + (item.jumlahSoalTampil ?? item.jumlahSoal ?? 0), 0)
-  return `${jumlah} kuis · ${soal} soal · dibuka oleh ${daftarPembuat.value.join(', ') || 'Guru'}`
+  const infoBab = bab.value?.urutanBab ? `Bab ${bab.value.urutanBab} · ` : ''
+  return `${infoBab}${jumlah} kuis · ${soal} soal · dibuka oleh ${daftarPembuat.value.join(', ') || 'Guru'}`
 }
 
 async function handleLogout() {
