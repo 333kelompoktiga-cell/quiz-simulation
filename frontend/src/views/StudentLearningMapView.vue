@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ambilDaftarPetaBelajar } from '../services/petaBelajar'
+import { ambilDaftarPetaBelajar, isBabRegenerating, notifikasiPetaBelajar } from '../services/petaBelajar'
 import { getUser, SessionExpiredError } from '../services/auth'
 import StudentHeader from '../components/StudentHeader.vue'
 
@@ -68,6 +68,22 @@ onMounted(() => {
         </button>
       </div>
 
+      <!-- Notifikasi Pembaruan Latar Belakang -->
+      <div
+        v-if="notifikasiPetaBelajar"
+        role="status"
+        class="mt-4 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+      >
+        <span>✓ {{ notifikasiPetaBelajar }}</span>
+        <button
+          type="button"
+          class="ml-3 text-xs font-bold text-emerald-700 hover:underline select-none"
+          @click="notifikasiPetaBelajar = ''"
+        >
+          Tutup
+        </button>
+      </div>
+
       <p v-if="notice" role="status" class="mt-4 rounded-md border border-wf-brand-border bg-wf-brand-soft px-4 py-3 text-sm text-wf-brand">
         {{ notice }}
       </p>
@@ -98,8 +114,18 @@ onMounted(() => {
           <div>
             <div class="flex flex-wrap items-center gap-2">
               <h2 class="text-[16px] font-bold text-wf-text">{{ item.namaBab }}</h2>
+
+              <!-- Status badge jika sedang diperbarui di latar belakang -->
               <span
-                v-if="item.status === 'sempurna'"
+                v-if="isBabRegenerating(item.idBab)"
+                class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 border border-blue-200 animate-pulse"
+              >
+                <span class="size-2 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></span>
+                Sedang diperbarui AI...
+              </span>
+
+              <span
+                v-else-if="item.status === 'sempurna'"
                 class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200"
               >
                 ✓ Tuntas Sempurna
@@ -137,14 +163,15 @@ onMounted(() => {
             </button>
             <button
               type="button"
-              class="rounded-xl px-4 py-2.5 text-xs font-semibold shadow-sm transition"
+              class="rounded-xl px-4 py-2.5 text-xs font-semibold shadow-sm transition flex items-center gap-1.5"
               :class="item.status === 'terkunci'
                 ? 'border border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
                 : 'bg-wf-brand text-white hover:bg-wf-accent-hover'"
               :disabled="item.status === 'terkunci'"
               @click="bukaRoadmap(item)"
             >
-              {{ item.status === 'terkunci' ? 'TERKUNCI' : 'LIHAT ROADMAP' }}
+              <span v-if="isBabRegenerating(item.idBab)" class="size-3 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+              <span>{{ item.status === 'terkunci' ? 'TERKUNCI' : isBabRegenerating(item.idBab) ? 'LIHAT PROSES' : 'LIHAT ROADMAP' }}</span>
             </button>
           </div>
         </article>

@@ -198,7 +198,11 @@ export async function getRoadmapByBab(idUser, idBab) {
   if (!error && cached?.rekomendasi) {
     try {
       const parsed = JSON.parse(cached.rekomendasi);
-      return parsed;
+      const isTainted = /silahkan\s+hapus|bab\s+testing|template\s+soal|\b123\b|pemahaman\s+kaidah\s+bab/i.test(JSON.stringify(parsed));
+      if (!isTainted && Array.isArray(parsed?.tahapan)) {
+        return parsed;
+      }
+      console.log(`[roadmapService] Cache roadmap bab ${idBab} terdeteksi mengandung teks uji coba/placeholder, memperbarui secara otomatis...`);
     } catch {
       // Jika parsing gagal, generate ulang di bawah
     }
