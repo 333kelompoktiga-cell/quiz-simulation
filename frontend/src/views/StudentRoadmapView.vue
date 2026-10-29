@@ -1,16 +1,22 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ambilRoadmapBab, perbaruiRoadmapBab } from '../services/petaBelajar'
+import {
+  ambilRoadmapBab,
+  perbaruiRoadmapBab,
+  isBabRegenerating,
+  getOngoingRegeneratePromise,
+  roadmapCache,
+} from '../services/petaBelajar'
 import { getUser, SessionExpiredError } from '../services/auth'
 import StudentHeader from '../components/StudentHeader.vue'
 
 const props = defineProps({ id: { type: String, required: true } })
 const router = useRouter()
 const user = ref(getUser())
-const roadmapData = ref(null)
-const loading = ref(true)
-const regenerating = ref(false)
+const roadmapData = ref(roadmapCache[props.id] || null)
+const loading = ref(!roadmapCache[props.id])
+const isRegenerating = computed(() => isBabRegenerating(props.id))
 const errorMsg = ref('')
 const notice = ref('')
 
@@ -19,8 +25,36 @@ const tahapan = computed(() => roadmapData.value?.tahapan || [])
 const status = computed(() => roadmapData.value?.status || 'roadmap')
 
 async function muatRoadmap() {
-  loading.value = true
   errorMsg.value = ''
+
+  // Jika sedang ada proses regenerasi latar belakang untuk bab ini
+  if (isBabRegenerating(props.id)) {
+    const ongoing = getOngoingRegeneratePromise(props.id)
+    if (ongoing) {
+      if (!roadmapData.value) loading.value = true
+      ongoing
+        .then((data) => {
+          roadmapData.value = data
+          notice.value = 'Roadmap berhasil diperbarui berdasarkan hasil kuis terbaru Anda!'
+        })
+        .catch((err) => {
+          errorMsg.value = err.message || 'Gagal memperbarui roadmap.'
+        })
+        .finally(() => {
+          loading.value = false
+        })
+      return
+    }
+  }
+
+  // Jika sudah ada cache di memori lokal
+  if (roadmapCache[props.id]) {
+    roadmapData.value = roadmapCache[props.id]
+    loading.value = false
+  } else {
+    loading.value = true
+  }
+
   try {
     const data = await ambilRoadmapBab(props.id)
     roadmapData.value = data
@@ -36,7 +70,6 @@ async function muatRoadmap() {
 }
 
 async function handleRegenerate() {
-  regenerating.value = true
   errorMsg.value = ''
   notice.value = ''
   try {
@@ -45,8 +78,6 @@ async function handleRegenerate() {
     notice.value = 'Roadmap berhasil diperbarui berdasarkan hasil kuis terbaru Anda!'
   } catch (err) {
     errorMsg.value = err.message || 'Gagal memperbarui roadmap.'
-  } finally {
-    regenerating.value = false
   }
 }
 
@@ -79,11 +110,11 @@ onMounted(() => {
           <button
             type="button"
             class="flex items-center gap-2 rounded-xl border border-wf-brand-border bg-wf-brand-soft px-4 py-2.5 text-xs font-semibold text-wf-brand transition hover:bg-wf-brand/10 disabled:opacity-50"
-            :disabled="loading || regenerating"
+            :disabled="loading || isRegenerating"
             @click="handleRegenerate"
           >
-            <span v-if="regenerating" class="size-3.5 animate-spin rounded-full border-2 border-wf-brand border-t-transparent"></span>
-            <span>{{ regenerating ? 'AI Sedang Menganalisis...' : '↻ Perbarui dari Kuis Terbaru' }}</span>
+            <span v-if="isRegenerating" class="size-3.5 animate-spin rounded-full border-2 border-wf-brand border-t-transparent"></span>
+            <span>{{ isRegenerating ? 'AI Sedang Menganalisis...' : '↻ Perbarui dari Kuis Terbaru' }}</span>
           </button>
           <RouterLink
             :to="`/latihan/${props.id}`"
@@ -91,6 +122,20 @@ onMounted(() => {
           >
             Kerjakan Kuis Bab Ini
           </RouterLink>
+        </div>
+      </div>
+
+      <!-- Banner Proses Pembaruan Latar Belakang (Persistent across navigation) -->
+      <div
+        v-if="isRegenerating"
+        class="mt-4 flex items-center gap-3.5 rounded-xl border border-wf-brand-border bg-wf-brand-soft/90 p-4 text-wf-brand shadow-sm animate-pulse"
+      >
+        <span class="size-5 animate-spin rounded-full border-2 border-wf-brand border-t-transparent flex-shrink-0"></span>
+        <div class="text-xs sm:text-sm">
+          <strong class="font-bold text-wf-brand">AI sedang memperbarui roadmap di latar belakang...</strong>
+          <p class="text-xs text-wf-secondary mt-0.5 leading-relaxed">
+            Proses analisis kuis terbaru tetap berjalan meskipun Anda berpindah ke halaman lain. Hasil akan otomatis tersimpan dan diperbarui.
+          </p>
         </div>
       </div>
 
@@ -245,10 +290,10 @@ onMounted(() => {
         <button
           type="button"
           class="rounded-xl bg-wf-accent px-6 py-3 text-sm font-bold text-white hover:bg-wf-accent-hover shadow-sm transition disabled:opacity-50"
-          :disabled="regenerating || loading"
+          :disabled="isRegenerating || loading"
           @click="handleRegenerate"
         >
-          {{ regenerating ? 'Memperbarui...' : '↻ PERBARUI DARI KUIS TERBARU' }}
+          {{ isRegenerating ? 'Memperbarui di Latar Belakang...' : '↻ PERBARUI DARI KUIS TERBARU' }}
         </button>
       </div>
     </main>

@@ -1,3 +1,10 @@
+import dns from 'node:dns';
+
+// Pastikan resolusi DNS di Windows memprioritaskan IPv4 untuk koneksi Supabase & OpenRouter
+if (dns && typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
+
 // Polyfill global browser-like objects required by pdfjs-dist in headless / serverless Node.js
 if (typeof globalThis.DOMMatrix === 'undefined') {
   globalThis.DOMMatrix = class DOMMatrix {
