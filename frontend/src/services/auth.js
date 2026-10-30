@@ -17,6 +17,15 @@ const AVATAR_KEY = 'avatar_url'
 // sedang berjalan tidak keburu ditolak di tengah jalan.
 const AMBANG_PERBARUI_DETIK = 120
 
+// Batas waktu tidak aktif (idle) sebelum sesi otomatis logout (dalam detik).
+// Ubah nilai ini jika ingin mengganti durasi idle timeout (saat ini: 10 menit / 600 detik).
+export const BATAS_IDLE_DETIK = 10 * 60
+const LAST_ACTIVE_KEY = 'last_active_at'
+
+function labelDurasiIdle() {
+  return BATAS_IDLE_DETIK % 60 === 0 ? `${BATAS_IDLE_DETIK / 60} menit` : `${BATAS_IDLE_DETIK} detik`
+}
+
 // Dilempar kalau sesi benar-benar habis: refresh token ikut ditolak, atau
 // akun direbut perangkat lain. Pemanggil cukup mengarahkan ke halaman login.
 export class SessionExpiredError extends Error {
@@ -110,6 +119,12 @@ async function pastikanTokenSegar() {
 // Permintaan yang butuh login: token disegarkan dulu, dan kalau server tetap
 // menjawab 401 maka sesinya memang sudah tidak berlaku.
 export async function kirimTerautentikasi(path, { method = 'POST', body } = {}) {
+  const terakhirAktif = Number(localStorage.getItem(LAST_ACTIVE_KEY) || 0)
+  if (terakhirAktif && Date.now() - terakhirAktif >= BATAS_IDLE_DETIK * 1000) {
+    await jalankanLogoutIdle()
+    throw new SessionExpiredError(`Sesi berakhir karena tidak ada aktivitas selama ${labelDurasiIdle()}.`)
+  }
+
   await pastikanTokenSegar()
 
   const hasil = await kirim(path, { method, body, token: getToken() })
@@ -189,10 +204,14 @@ function simpanToken({ token, refresh_token, expires_at }) {
 export function saveSession(data) {
   simpanToken(data)
   localStorage.setItem(USER_KEY, JSON.stringify(data.user))
+  terakhirCatatAktivitas = Date.now()
+  localStorage.setItem(LAST_ACTIVE_KEY, String(terakhirCatatAktivitas))
+  catatAktivitasPengguna()
 }
 
 export function clearSession() {
-  ;[TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY, USER_KEY].forEach((k) => localStorage.removeItem(k))
+  hentikanTimerIdle()
+  ;[TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY, USER_KEY, LAST_ACTIVE_KEY].forEach((k) => localStorage.removeItem(k))
 }
 
 export function getToken() {
@@ -229,4 +248,74 @@ export function takeNotice() {
   const message = sessionStorage.getItem(NOTICE_KEY)
   sessionStorage.removeItem(NOTICE_KEY)
   return message
+}
+
+// ── Deteksi tidak aktif (Idle Timeout) ──
+
+let timerIdleId = null
+let callbackSaatIdle = null
+let sedangLogoutIdle = false
+let terakhirCatatAktivitas = 0
+
+const EVENT_AKTIVITAS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click']
+
+function hentikanTimerIdle() {
+  if (timerIdleId) {
+    window.clearTimeout(timerIdleId)
+    timerIdleId = null
+  }
+}
+
+async function jalankanLogoutIdle() {
+  if (sedangLogoutIdle || !isLoggedIn()) return
+  sedangLogoutIdle = true
+  hentikanTimerIdle()
+  try {
+    const token = getToken()
+    if (token) {
+      await kirim('/auth/logout', { token }).catch(() => {})
+    }
+  } finally {
+    clearSession()
+    setNotice(`Sesi Anda telah berakhir karena tidak ada aktivitas selama ${labelDurasiIdle()}. Silakan login kembali.`)
+    sedangLogoutIdle = false
+    if (typeof callbackSaatIdle === 'function') {
+      callbackSaatIdle()
+    }
+  }
+}
+
+export function catatAktivitasPengguna() {
+  if (!isLoggedIn() || sedangLogoutIdle) return
+  const sekarang = Date.now()
+  const terakhirStorage = Number(localStorage.getItem(LAST_ACTIVE_KEY) || 0)
+  const terakhir = Math.max(terakhirCatatAktivitas, terakhirStorage)
+
+  if (terakhir && sekarang - terakhir >= BATAS_IDLE_DETIK * 1000) {
+    void jalankanLogoutIdle()
+    return
+  }
+
+  terakhirCatatAktivitas = sekarang
+  localStorage.setItem(LAST_ACTIVE_KEY, String(sekarang))
+
+  hentikanTimerIdle()
+  timerIdleId = window.setTimeout(() => {
+    void jalankanLogoutIdle()
+  }, BATAS_IDLE_DETIK * 1000)
+}
+
+export function mulaiPantauIdle(onIdleLogout) {
+  callbackSaatIdle = onIdleLogout
+  const handler = () => catatAktivitasPengguna()
+  EVENT_AKTIVITAS.forEach((evt) => window.addEventListener(evt, handler, { passive: true }))
+
+  if (isLoggedIn()) {
+    catatAktivitasPengguna()
+  }
+
+  return () => {
+    hentikanTimerIdle()
+    EVENT_AKTIVITAS.forEach((evt) => window.removeEventListener(evt, handler))
+  }
 }
