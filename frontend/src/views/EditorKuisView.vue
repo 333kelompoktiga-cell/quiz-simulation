@@ -200,7 +200,7 @@ async function tambahSoal() {
     indeksAktif.value = daftarSoal.value.length - 1
     sudahCobaSimpan.value = false
     snapshotAwal.value = snapshot()
-    infoMsg.value = `${jumlahTersimpan} soal berhasil disimpan ke database (status: Draf). Klik "SIMPAN SOAL" jika semua soal sudah selesai untuk generate password dan menerbitkan kuis.`
+    infoMsg.value = `Soal berhasil disimpan sementara (${jumlahTersimpan} soal tersimpan). Silakan isi soal berikutnya, atau klik "SIMPAN KUIS" jika sudah selesai agar kuis dapat dikerjakan oleh mahasiswa.`
   } catch (err) {
     tanganiError(err)
   } finally {
@@ -597,6 +597,19 @@ async function simpanDokumen() {
           <code>\frac</code> untuk pecahan.
         </p>
 
+        <!-- Info panduan penyimpanan untuk dosen -->
+        <div class="rounded-lg bg-wf-brand-soft/60 border border-wf-brand-border px-4 py-3 text-[14px] sm:text-[15px] leading-6 text-wf-text flex flex-col gap-1">
+          <p class="font-semibold text-wf-brand">Panduan Penyimpanan Kuis:</p>
+          <ul class="list-disc pl-5 text-wf-secondary space-y-0.5">
+            <li>
+              Klik <b>+ Tambah Soal</b> (atau tombol <b>+</b> di Navigasi Soal) untuk <b>menyimpan soal sementara</b> dan lanjut membuat soal berikutnya. Pada tahap ini, mahasiswa <b>belum bisa</b> mengerjakan kuis.
+            </li>
+            <li>
+              Klik <b>SIMPAN KUIS</b> jika semua soal sudah selesai dibuat. Kuis akan <b>diterbitkan beserta password-nya</b> sehingga <b>langsung bisa dikerjakan oleh mahasiswa</b>.
+            </li>
+          </ul>
+        </div>
+
         <!-- Baris judul -->
         <div class="flex flex-wrap items-end gap-4">
           <div class="flex-1 min-w-[260px] flex flex-col gap-1">
@@ -640,7 +653,7 @@ async function simpanDokumen() {
               :disabled="menyimpan || menyimpanSoal"
               class="rounded-xl bg-wf-accent hover:bg-wf-accent-hover px-6 py-4 text-[20px] lg:text-[22px] leading-7 font-semibold tracking-[0.2px] text-white disabled:opacity-60 min-w-[190px]"
             >
-              {{ menyimpan ? 'MENYIMPAN...' : 'SIMPAN SOAL' }}
+              {{ menyimpan ? 'MENYIMPAN...' : 'SIMPAN KUIS' }}
             </button>
           </div>
         </div>
@@ -1109,7 +1122,7 @@ async function simpanDokumen() {
             :disabled="menyimpan || !berkas"
             class="rounded-xl bg-wf-accent hover:bg-wf-accent-hover px-6 py-4 text-[18px] leading-6 font-semibold tracking-[0.2px] text-white disabled:opacity-50 disabled:cursor-not-allowed min-w-[190px]"
           >
-            {{ menyimpan ? 'MENGEKSTRAK...' : 'SIMPAN SOAL' }}
+            {{ menyimpan ? 'MENGEKSTRAK...' : 'SIMPAN KUIS' }}
           </button>
         </div>
       </section>
