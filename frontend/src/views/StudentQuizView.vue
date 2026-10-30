@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   mulaiPengerjaanKuis,
@@ -17,7 +17,7 @@ const waktuPerSoal = ref({})
 const ragu = ref(new Set())
 const nomorAktif = ref(0)
 const sisaDetik = ref(0)
-const loading = ref(false)
+const loading = ref(true)
 const errorMsg = ref('')
 const submitted = ref(false)
 const submitting = ref(false)
@@ -29,7 +29,68 @@ let saveQueue = Promise.resolve()
 // ── PIN dari dosen ──
 // Pop-up muncul begitu halaman dibuka (setelah klik MULAI). Pengerjaan baru dibuat
 // di backend setelah PIN benar; kalau salah, backend menolak dan soal tidak dimuat.
-const tampilPin = ref(true)
+const kunciSesiPin = (idKuis) => `pin_kuis_terverifikasi_${idKuis}`
+const kunciStatePengerjaan = (idAttempt) => `state_pengerjaan_${idAttempt}`
+
+function simpanStatusPin(idKuis, idAttempt, waktuMulai, durasiMenit) {
+  try {
+    const durasiMs = Math.max(1, Number(durasiMenit) || 30) * 60 * 1000
+    const mulaiMs = waktuMulai ? new Date(waktuMulai).getTime() : Date.now()
+    sessionStorage.setItem(
+      kunciSesiPin(idKuis),
+      JSON.stringify({
+        verified: true,
+        idPengerjaan: idAttempt,
+        expiresAt: new Date(mulaiMs + durasiMs).toISOString(),
+      }),
+    )
+  } catch {
+    // Abaikan jika sessionStorage tidak tersedia
+  }
+}
+
+function hapusStatusPin(idKuis, idAttempt) {
+  try {
+    sessionStorage.removeItem(kunciSesiPin(idKuis))
+    if (idAttempt) sessionStorage.removeItem(kunciStatePengerjaan(idAttempt))
+  } catch {
+    // Abaikan jika sessionStorage tidak tersedia
+  }
+}
+
+function simpanStateLokal() {
+  if (!idPengerjaan.value) return
+  try {
+    sessionStorage.setItem(
+      kunciStatePengerjaan(idPengerjaan.value),
+      JSON.stringify({
+        nomorAktif: nomorAktif.value,
+        ragu: [...ragu.value],
+      }),
+    )
+  } catch {
+    // Abaikan jika sessionStorage penuh
+  }
+}
+
+function pulihkanStateLokal(idAttempt, totalSoal) {
+  if (!idAttempt) return
+  try {
+    const raw = sessionStorage.getItem(kunciStatePengerjaan(idAttempt))
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed?.ragu)) {
+      ragu.value = new Set(parsed.ragu.filter((i) => Number.isInteger(i) && i >= 0 && i < totalSoal))
+    }
+    if (Number.isInteger(parsed?.nomorAktif) && parsed.nomorAktif >= 0 && parsed.nomorAktif < totalSoal) {
+      nomorAktif.value = parsed.nomorAktif
+    }
+  } catch {
+    // Abaikan jika data korup
+  }
+}
+
+const tampilPin = ref(false)
 const pinInput = ref('')
 const errorPin = ref('')
 const memeriksaPin = ref(false)
@@ -56,6 +117,7 @@ function toggleRagu() {
   if (salinan.has(nomorAktif.value)) salinan.delete(nomorAktif.value)
   else salinan.add(nomorAktif.value)
   ragu.value = salinan
+  simpanStateLokal()
 }
 
 function statusNomor(index) {
@@ -70,7 +132,7 @@ function formatOpsi(teks) {
 }
 
 function keluarUjian() {
-  if (window.confirm('Keluar dari ujian? Jawaban yang belum dikirim akan tetap tersimpan di halaman ini.')) {
+  if (!idPengerjaan.value || window.confirm('Keluar dari ujian? Jawaban yang belum dikirim akan tetap tersimpan di halaman ini.')) {
     router.back()
   }
 }
@@ -125,6 +187,7 @@ async function kirimJawaban(automatic = false) {
   try {
     await saveQueue.catch(() => {})
     const result = await submitPengerjaanKuis(idPengerjaan.value, daftarJawaban())
+    hapusStatusPin(props.id, idPengerjaan.value)
     submitted.value = true
     await router.replace({
       path: `/kuis/${props.id}/hasil`,
@@ -154,6 +217,8 @@ const waktuMulaiServer = ref('')
 const batasWaktu = ref(0)
 
 watch(nomorAktif, (_, previousIndex) => {
+  if (!idPengerjaan.value || !waktuMulaiSoal) return
+  simpanStateLokal()
   catatWaktuSoal(previousIndex)
   waktuMulaiSoal = Date.now()
   simpanJawabanKeServer()
@@ -168,6 +233,8 @@ async function mulaiKuis(pin) {
   waktuMulaiServer.value = data.pengerjaan.waktuMulai
   batasWaktu.value = Math.max(1, Number(data.kuis.durasi) || 30) * 60
 
+  jawaban.value = {}
+  waktuPerSoal.value = {}
   const jawabanTersimpan = new Map(data.jawaban.map((answer) => [answer.idSoal, answer]))
   soal.value.forEach((question, index) => {
     const saved = jawabanTersimpan.get(question.idSoal)
@@ -177,6 +244,11 @@ async function mulaiKuis(pin) {
     waktuPerSoal.value[question.idSoal] = Number(saved.responseTime) || 0
   })
 
+  pulihkanStateLokal(data.pengerjaan.idPengerjaan, soal.value.length)
+  simpanStatusPin(props.id, data.pengerjaan.idPengerjaan, data.pengerjaan.waktuMulai, data.kuis.durasi)
+  tampilPin.value = false
+
+  window.clearInterval(timerId)
   hitungMundur()
   if (sisaDetik.value > 0) timerId = window.setInterval(hitungMundur, 1000)
   waktuMulaiSoal = Date.now()
@@ -210,6 +282,29 @@ async function verifikasiPin() {
 function batalPin() {
   router.back()
 }
+
+onMounted(async () => {
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    // Jika sesi pengerjaan masih aktif (mis. saat halaman di-refresh/F5 atau
+    // klik LANJUTKAN), muat langsung lembar soal aktif tanpa meminta PIN ulang.
+    await mulaiKuis()
+  } catch (err) {
+    if (err instanceof SessionExpiredError) {
+      router.push('/')
+      return
+    }
+    hapusStatusPin(props.id)
+    if (err.payload?.code === 'PIN_DIBUTUHKAN') {
+      tampilPin.value = true
+    } else {
+      errorMsg.value = err.message
+    }
+  } finally {
+    loading.value = false
+  }
+})
 
 onBeforeUnmount(() => window.clearInterval(timerId))
 </script>
