@@ -25,6 +25,7 @@ const keRespons = ({ pin, pembuat, ...kuis }, user) => {
     ...kuis,
     namaPembuat: pembuat?.nama ?? null,
     adaPin: pin !== null,
+    status: pin !== null ? 'terbit' : 'draf',
     bisaDikelola: kelola,
     bisaAturAkses: bisaAturAkses(kuis, user),
     ...(kelola && { pin }),
@@ -82,6 +83,7 @@ export const getAllKuis = async (req, res) => {
         // Jumlah soal yang dikerjakan mahasiswa per percobaan (bisa lebih sedikit kalau acak soal aktif).
         jumlahSoalTampil: jumlahSoalDikerjakan(kuis, jumlahSoal),
         tersedia,
+        status: tersedia ? 'terbit' : 'draf',
         nilaiTerakhir: hasilTerakhir?.skorFuzzy ?? null,
         kategoriTerakhir: hasilTerakhir?.kategoriFuzzy ?? null,
         akurasiTerakhir: hasilTerakhir?.akurasi ?? null,
@@ -121,8 +123,9 @@ export const getKuisById = async (req, res) => {
 // Hanya admin (guru) yang bisa membuat kuis — pemiliknya adalah guru yang sedang login
 export const createKuis = async (req, res) => {
   try {
-    // pin tidak diterima dari client: password dibuat otomatis oleh server.
-    const { idBab, judul, deskripsi, durasi } = req.body;
+    // Saat kuis pertama kali dibuat (mis. saat klik Tambah Soal), pin bernilai null (status Draf).
+    // Password baru dibuat saat kuis di-submit / simpan soal (publish / generatePin).
+    const { idBab, judul, deskripsi, durasi, generatePin, publish } = req.body;
 
     if (!idBab || !judul || !judul.trim()) {
       return res.status(400).json(errorResponse({ message: 'idBab dan judul wajib diisi.' }));
@@ -137,7 +140,7 @@ export const createKuis = async (req, res) => {
       idBab,
       judul: judul.trim(),
       deskripsi: deskripsi ?? null,
-      pin: buatPasswordKuis(),
+      pin: generatePin === true || publish === true ? buatPasswordKuis() : null,
       ...acak.data,
     };
     if (durasi !== undefined && durasi !== null) {
@@ -173,17 +176,18 @@ export const updateKuis = async (req, res) => {
   try {
     const { id } = req.params;
     // generatePin: true = buat password baru (dipakai tombol "Generate" di pop-up password).
-    const { idBab, judul, deskripsi, durasi, pin, generatePin, acakSoal, jumlahTampil } = req.body;
+    // publish: true = terbitkan kuis dengan men-generate password jika belum punya password.
+    const { idBab, judul, deskripsi, durasi, pin, generatePin, publish, acakSoal, jumlahTampil } = req.body;
 
     if (idBab === undefined && judul === undefined && deskripsi === undefined
       && durasi === undefined && pin === undefined && generatePin === undefined
-      && acakSoal === undefined && jumlahTampil === undefined) {
+      && publish === undefined && acakSoal === undefined && jumlahTampil === undefined) {
       return res.status(400).json(errorResponse({ message: 'Tidak ada data yang diubah.' }));
     }
 
     const { data: existing, error: findError } = await supabaseAdmin
       .from('Kuis')
-      .select(KOLOM_AKSES_KUIS)
+      .select(`${KOLOM_AKSES_KUIS}, pin`)
       .eq('idKuis', id)
       .single();
 
@@ -224,8 +228,12 @@ export const updateKuis = async (req, res) => {
       }
       updatePayload.pin = pin;
     }
-    // Password baru hanya dibuat kalau diminta eksplisit; menyimpan/mengedit kuis tidak mengubahnya.
-    if (generatePin === true) updatePayload.pin = buatPasswordKuis();
+    // Password baru dibuat saat diminta eksplisit (generatePin) atau saat publish kuis yang belum punya password.
+    if (generatePin === true) {
+      updatePayload.pin = buatPasswordKuis();
+    } else if (publish === true) {
+      updatePayload.pin = existing.pin || buatPasswordKuis();
+    }
 
     const { data, error } = await supabaseAdmin
       .from('Kuis')

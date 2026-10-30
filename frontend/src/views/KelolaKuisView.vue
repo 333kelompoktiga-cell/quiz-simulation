@@ -169,7 +169,9 @@ async function simpanPassword(manual = false) {
   try {
     const hasil = await ubahKuis(kuis.idKuis, manual ? { pin: passwordManual.value } : { generatePin: true })
     daftarKuis.value = daftarKuis.value.map((k) =>
-      k.idKuis === kuis.idKuis ? { ...k, pin: hasil.pin, adaPin: true } : k,
+      k.idKuis === kuis.idKuis
+        ? { ...k, pin: hasil.pin, adaPin: true, status: (k.jumlahSoal ?? 0) > 0 ? 'terbit' : k.status }
+        : k,
     )
     tersalin.value = false
     clearTimeout(timerSalin)

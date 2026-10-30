@@ -58,6 +58,7 @@ const indeksAktif = ref(0)
 
 const memuat = ref(true)
 const menyimpan = ref(false)
+const menyimpanSoal = ref(false)
 const errorMsg = ref('')
 const infoMsg = ref('')
 const sudahCobaSimpan = ref(false)
@@ -94,6 +95,14 @@ function intisari(teks) {
 }
 
 // ── Validasi ──
+function isSoalKosong(s) {
+  if (!s || typeof s !== 'object') return true
+  const pertanyaanKosong = typeof s.pertanyaan !== 'string' || !s.pertanyaan.trim()
+  const opsiKosong = !Array.isArray(s.opsi) || s.opsi.every((o) => typeof o !== 'string' || !o.trim())
+  const pembahasanKosong = typeof s.pembahasan !== 'string' || !s.pembahasan.trim()
+  return pertanyaanKosong && opsiKosong && s.kunci === null && pembahasanKosong
+}
+
 function masalahSoal(s) {
   if (!s || typeof s !== 'object') return 'data soal tidak valid'
   if (typeof s.pertanyaan !== 'string' || !s.pertanyaan.trim()) return 'pertanyaan masih kosong'
@@ -101,6 +110,35 @@ function masalahSoal(s) {
   if (s.opsi.some((o) => typeof o !== 'string' || !o.trim())) return 'ada opsi jawaban yang kosong'
   if (s.kunci === null) return 'jawaban benar belum dipilih'
   return null
+}
+
+function validasiInfoKuis() {
+  if (!info.value.judul.trim()) {
+    errorMsg.value = 'Nama kuis wajib diisi.'
+    return false
+  }
+  if (!info.value.idBab) {
+    errorMsg.value = 'Pilih bab untuk kuis ini.'
+    return false
+  }
+  if (!Number.isInteger(info.value.durasi) || info.value.durasi <= 0) {
+    errorMsg.value = 'Durasi kuis harus bilangan bulat lebih dari 0 menit.'
+    return false
+  }
+  return true
+}
+
+function buatPayloadKuis(jumlahSoalValid) {
+  const bolehAcak = jumlahSoalValid >= MIN_SOAL_ACAK && info.value.acakSoal
+  return {
+    judul: info.value.judul.trim(),
+    idBab: info.value.idBab,
+    deskripsi: info.value.deskripsi.trim() || null,
+    durasi: info.value.durasi,
+    // Di bawah 20 soal opsi acak soal dimatikan; urutan soal tetap diacak oleh backend.
+    acakSoal: bolehAcak,
+    jumlahTampil: bolehAcak ? info.value.jumlahTampil : null,
+  }
 }
 
 const jumlahLengkap = computed(() => daftarSoal.value.filter((s) => !masalahSoal(s)).length)
@@ -112,14 +150,61 @@ function kelasNomor(i) {
   return 'bg-wf-card border border-wf-border text-wf-secondary'
 }
 
-// ── Navigasi soal ──
+// ── Navigasi & Tambah Soal (simpan ke Supabase sebagai Draf) ──
 function pindahKe(i) {
   indeksAktif.value = i
 }
 
-function tambahSoal() {
-  daftarSoal.value.push(soalKosong())
-  indeksAktif.value = daftarSoal.value.length - 1
+async function tambahSoal() {
+  if (menyimpan.value || menyimpanSoal.value) return
+  errorMsg.value = ''
+  infoMsg.value = ''
+  sudahCobaSimpan.value = true
+
+  if (!validasiInfoKuis()) return
+
+  const akhirKosong =
+    daftarSoal.value.length > 1 && isSoalKosong(daftarSoal.value[daftarSoal.value.length - 1])
+  const daftarDicek =
+    akhirKosong && indeksAktif.value < daftarSoal.value.length - 1
+      ? daftarSoal.value.slice(0, -1)
+      : daftarSoal.value
+
+  const indeksSalah = daftarDicek.findIndex((s) => masalahSoal(s))
+  if (indeksSalah !== -1) {
+    indeksAktif.value = indeksSalah
+    errorMsg.value = `Soal ${indeksSalah + 1}: ${masalahSoal(daftarDicek[indeksSalah])}. Lengkapi soal sebelum menambah soal baru.`
+    return
+  }
+
+  menyimpanSoal.value = true
+  const dataKuis = buatPayloadKuis(daftarDicek.length)
+
+  try {
+    // Buat kuis sebagai Draf (pin: null) jika belum ada di Supabase, atau perbarui info kuis.
+    if (idKuisTersimpan.value) {
+      await ubahKuis(idKuisTersimpan.value, dataKuis)
+    } else {
+      const kuis = await buatKuis(dataKuis)
+      idKuisTersimpan.value = kuis.idKuis
+    }
+
+    // Simpan soal yang sudah diisi ke Supabase
+    await simpanSoalKuis(idKuisTersimpan.value, daftarDicek)
+
+    const jumlahTersimpan = daftarDicek.length
+    if (!akhirKosong) {
+      daftarSoal.value.push(soalKosong())
+    }
+    indeksAktif.value = daftarSoal.value.length - 1
+    sudahCobaSimpan.value = false
+    snapshotAwal.value = snapshot()
+    infoMsg.value = `${jumlahTersimpan} soal berhasil disimpan ke database (status: Draf). Klik "SIMPAN SOAL" jika semua soal sudah selesai untuk generate password dan menerbitkan kuis.`
+  } catch (err) {
+    tanganiError(err)
+  } finally {
+    menyimpanSoal.value = false
+  }
 }
 
 function selanjutnya() {
@@ -127,11 +212,23 @@ function selanjutnya() {
   else indeksAktif.value += 1
 }
 
-function hapusSoalAktif() {
-  if (daftarSoal.value.length === 1) return
+async function hapusSoalAktif() {
+  if (daftarSoal.value.length === 1 || menyimpan.value || menyimpanSoal.value) return
   if (!window.confirm(`Hapus soal ${indeksAktif.value + 1}?`)) return
   daftarSoal.value.splice(indeksAktif.value, 1)
   indeksAktif.value = Math.min(indeksAktif.value, daftarSoal.value.length - 1)
+
+  if (idKuisTersimpan.value) {
+    const soalValid = daftarSoal.value.filter((s) => !masalahSoal(s))
+    if (soalValid.length > 0) {
+      try {
+        await simpanSoalKuis(idKuisTersimpan.value, soalValid)
+        snapshotAwal.value = snapshot()
+      } catch (err) {
+        tanganiError(err)
+      }
+    }
+  }
 }
 
 // ── Opsi jawaban ──
@@ -223,60 +320,57 @@ onBeforeUnmount(() => {
   if (urlBerkas.value) URL.revokeObjectURL(urlBerkas.value)
 })
 
-// ── Simpan (Input Manual) ──
+// ── Simpan Soal & Terbitkan Kuis (Input Manual) ──
 async function simpan() {
+  if (menyimpan.value || menyimpanSoal.value) return
   errorMsg.value = ''
   infoMsg.value = ''
   sudahCobaSimpan.value = true
 
-  if (!info.value.judul.trim()) {
-    errorMsg.value = 'Nama kuis wajib diisi.'
-    return
-  }
-  if (!info.value.idBab) {
-    errorMsg.value = 'Pilih bab untuk kuis ini.'
-    return
-  }
-  if (!Number.isInteger(info.value.durasi) || info.value.durasi <= 0) {
-    errorMsg.value = 'Durasi kuis harus bilangan bulat lebih dari 0 menit.'
-    return
-  }
-  const indeksSalah = daftarSoal.value.findIndex((s) => masalahSoal(s))
+  if (!validasiInfoKuis()) return
+
+  // Jika soal paling akhir masih kosong sepenuhnya (misal setelah klik + Tambah Soal lalu langsung klik Simpan Soal),
+  // abaikan soal kosong terakhir tersebut selama sudah ada minimal 1 soal sebelumnya.
+  const abaikanAkhirKosong =
+    daftarSoal.value.length > 1 && isSoalKosong(daftarSoal.value[daftarSoal.value.length - 1])
+  const dataSoal = abaikanAkhirKosong ? daftarSoal.value.slice(0, -1) : daftarSoal.value
+
+  const indeksSalah = dataSoal.findIndex((s) => masalahSoal(s))
   if (indeksSalah !== -1) {
     indeksAktif.value = indeksSalah
-    errorMsg.value = `Soal ${indeksSalah + 1}: ${masalahSoal(daftarSoal.value[indeksSalah])}.`
+    errorMsg.value = `Soal ${indeksSalah + 1}: ${masalahSoal(dataSoal[indeksSalah])}.`
     return
   }
+
+  const bisaAcakFinal = dataSoal.length >= MIN_SOAL_ACAK
+  const acakFinal = bisaAcakFinal && info.value.acakSoal
+  const maksTampilFinal = dataSoal.length - MIN_CADANGAN
   const tampil = info.value.jumlahTampil
-  if (acakAktif.value && (!Number.isInteger(tampil) || tampil < MIN_TAMPIL || tampil > maksTampil.value)) {
-    errorMsg.value = `Jumlah soal yang ditampilkan harus ${MIN_TAMPIL} sampai ${maksTampil.value} (minimal ${MIN_CADANGAN} soal cadangan).`
+  if (acakFinal && (!Number.isInteger(tampil) || tampil < MIN_TAMPIL || tampil > maksTampilFinal)) {
+    errorMsg.value = `Jumlah soal yang ditampilkan harus ${MIN_TAMPIL} sampai ${maksTampilFinal} (minimal ${MIN_CADANGAN} soal cadangan).`
     return
   }
 
   menyimpan.value = true
-  const dataKuis = {
-    judul: info.value.judul.trim(),
-    idBab: info.value.idBab,
-    deskripsi: info.value.deskripsi.trim() || null,
-    durasi: info.value.durasi,
-    // Di bawah 20 soal opsi acak soal dimatikan; urutan soal tetap diacak oleh backend.
-    acakSoal: acakAktif.value,
-    jumlahTampil: acakAktif.value ? tampil : null,
-  }
-  const dataSoal = daftarSoal.value
+  const dataKuis = buatPayloadKuis(dataSoal.length)
 
   try {
-    if (idKuisTersimpan.value) {
-      await ubahKuis(idKuisTersimpan.value, dataKuis)
-    } else {
+    if (!idKuisTersimpan.value) {
       const kuis = await buatKuis(dataKuis)
       idKuisTersimpan.value = kuis.idKuis
     }
 
     await simpanSoalKuis(idKuisTersimpan.value, dataSoal)
 
+    // Generate password (pin) sehingga kuis berstatus Terbit (published)
+    const kuisTerbit = await ubahKuis(idKuisTersimpan.value, {
+      ...dataKuis,
+      publish: true,
+    })
+
     bersih.value = true
-    setNotice(`Kuis "${dataKuis.judul}" berhasil disimpan dengan ${daftarSoal.value.length} soal.`)
+    const infoPin = kuisTerbit?.pin ? ` Password kuis: ${kuisTerbit.pin}.` : ''
+    setNotice(`Kuis "${dataKuis.judul}" berhasil disimpan dan diterbitkan dengan ${dataSoal.length} soal.${infoPin}`)
     router.push(`/bab/${dataKuis.idBab}/kuis`)
   } catch (err) {
     if (err instanceof EndpointBelumAdaError) {
@@ -408,12 +502,23 @@ async function simpanDokumen() {
     })
     hasilImpor.value = hasil
 
-    if (hasil.berhasil?.length > 0 && !hasil.gagal?.length) {
-      // Semua soal berhasil → langsung pindah halaman
-      bersih.value = true
-      setNotice(`Kuis "${info.value.judul.trim()}" berhasil dibuat dengan ${hasil.berhasil.length} soal.`)
-      router.push(`/bab/${info.value.idBab}/kuis`)
-    } else if (!hasil.berhasil?.length) {
+    if (hasil.berhasil?.length > 0) {
+      // 3) Generate password (pin) sehingga kuis berstatus Terbit (published)
+      const kuisTerbit = await ubahKuis(idKuisTersimpan.value, {
+        judul: info.value.judul.trim(),
+        idBab: info.value.idBab,
+        durasi: info.value.durasi,
+        publish: true,
+      })
+
+      if (!hasil.gagal?.length) {
+        // Semua soal berhasil → langsung pindah halaman
+        bersih.value = true
+        const infoPin = kuisTerbit?.pin ? ` Password kuis: ${kuisTerbit.pin}.` : ''
+        setNotice(`Kuis "${info.value.judul.trim()}" berhasil diterbitkan dengan ${hasil.berhasil.length} soal.${infoPin}`)
+        router.push(`/bab/${info.value.idBab}/kuis`)
+      }
+    } else {
       errorMsg.value = hasil.message
     }
     // Kalau sebagian gagal: tetap di halaman, daftar soal gagal ditampilkan di bawah.
@@ -528,10 +633,10 @@ async function simpanDokumen() {
             <button
               type="button"
               @click="simpan"
-              :disabled="menyimpan"
+              :disabled="menyimpan || menyimpanSoal"
               class="rounded-xl bg-wf-accent hover:bg-wf-accent-hover px-6 py-4 text-[20px] lg:text-[22px] leading-7 font-semibold tracking-[0.2px] text-white disabled:opacity-60 min-w-[190px]"
             >
-              {{ menyimpan ? 'MENYIMPAN...' : 'SIMPAN KUIS' }}
+              {{ menyimpan ? 'MENYIMPAN...' : 'SIMPAN SOAL' }}
             </button>
           </div>
         </div>
@@ -637,9 +742,16 @@ async function simpanDokumen() {
               <button
                 type="button"
                 @click="selanjutnya"
-                class="shrink-0 whitespace-nowrap rounded-xl bg-wf-card border border-wf-brand-border px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 text-[14px] sm:text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] text-wf-brand"
+                :disabled="menyimpan || menyimpanSoal"
+                class="shrink-0 whitespace-nowrap rounded-xl bg-wf-card border border-wf-brand-border px-3 sm:px-4 lg:px-5 py-2.5 sm:py-3 text-[14px] sm:text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] text-wf-brand disabled:opacity-60"
               >
-                {{ indeksAktif === daftarSoal.length - 1 ? '+ SOAL BARU' : 'SELANJUTNYA' }}
+                {{
+                  indeksAktif === daftarSoal.length - 1
+                    ? menyimpanSoal
+                      ? 'MENYIMPAN...'
+                      : '+ TAMBAH SOAL'
+                    : 'SELANJUTNYA'
+                }}
               </button>
             </div>
 
@@ -691,14 +803,25 @@ async function simpanDokumen() {
               ></textarea>
             </div>
 
-            <button
-              v-if="daftarSoal.length > 1"
-              type="button"
-              @click="hapusSoalAktif"
-              class="self-start rounded-xl bg-wf-card border border-wf-no-border hover:bg-red-50 px-4 lg:px-5 py-3 text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] text-wf-no transition"
-            >
-              HAPUS SOAL {{ indeksAktif + 1 }}
-            </button>
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                @click="tambahSoal"
+                :disabled="menyimpan || menyimpanSoal"
+                class="rounded-xl bg-wf-brand-soft border border-wf-brand-border hover:bg-wf-brand hover:text-white px-4 lg:px-5 py-3 text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] text-wf-brand transition disabled:opacity-60"
+              >
+                {{ menyimpanSoal ? 'MENYIMPAN SOAL...' : '+ TAMBAH SOAL' }}
+              </button>
+              <button
+                v-if="daftarSoal.length > 1"
+                type="button"
+                @click="hapusSoalAktif"
+                :disabled="menyimpan || menyimpanSoal"
+                class="rounded-xl bg-wf-card border border-wf-no-border hover:bg-red-50 px-4 lg:px-5 py-3 text-[16px] lg:text-[19px] leading-[26px] font-semibold tracking-[0.2px] text-wf-no transition disabled:opacity-60"
+              >
+                HAPUS SOAL {{ indeksAktif + 1 }}
+              </button>
+            </div>
           </div>
 
           <!-- Kolom kanan -->
@@ -721,8 +844,9 @@ async function simpanDokumen() {
                 <button
                   type="button"
                   @click="tambahSoal"
+                  :disabled="menyimpan || menyimpanSoal"
                   aria-label="Tambah soal"
-                  class="h-12 rounded-md border border-dashed border-wf-brand-border text-[19px] font-semibold text-wf-brand"
+                  class="h-12 rounded-md border border-dashed border-wf-brand-border text-[19px] font-semibold text-wf-brand disabled:opacity-60"
                 >
                   +
                 </button>
@@ -961,7 +1085,7 @@ async function simpanDokumen() {
             :disabled="menyimpan || !berkas"
             class="rounded-xl bg-wf-accent hover:bg-wf-accent-hover px-6 py-4 text-[18px] leading-6 font-semibold tracking-[0.2px] text-white disabled:opacity-50 disabled:cursor-not-allowed min-w-[190px]"
           >
-            {{ menyimpan ? 'MENGEKSTRAK...' : 'SIMPAN KUIS' }}
+            {{ menyimpan ? 'MENGEKSTRAK...' : 'SIMPAN SOAL' }}
           </button>
         </div>
       </section>
