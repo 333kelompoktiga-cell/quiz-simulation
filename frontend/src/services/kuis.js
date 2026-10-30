@@ -61,7 +61,7 @@ export async function hapusKuis(idKuis) {
   return (await panggil(`/kuis/${idKuis}`, { method: 'DELETE' })).message
 }
 
-// ── Soal (menunggu backend) ──
+// ── Soal ──
 
 // Opsi disimpan di database lengkap dengan labelnya ("A. teks"), mengikuti
 // data hasil Ekstrak Soal. Di editor labelnya dilepas supaya urutan opsi
@@ -72,10 +72,23 @@ export function hurufOpsi(index) {
   return String.fromCharCode(65 + index)
 }
 
+function tandaTanganSoal(s) {
+  return JSON.stringify({
+    pertanyaan: (s?.pertanyaan ?? '').trim(),
+    opsi: Array.isArray(s?.opsi) ? s.opsi.map((o) => String(o ?? '').trim()) : [],
+    kunci: s?.kunci ?? null,
+    difficulty: s?.difficulty ?? 'Sedang',
+    targetTime: Number(s?.targetTime ?? 60),
+    pembahasan: (s?.pembahasan ?? '').trim(),
+    ringkasan: (s?.ringkasan ?? '').trim(),
+  })
+}
+
 function keEditor(soal) {
   const opsi = Array.isArray(soal?.opsi) ? soal.opsi : []
   const kunci = opsi.findIndex((o) => o.isCorrect)
-  return {
+  const item = {
+    idSoal: soal?.idSoal ?? null,
     pertanyaan: typeof soal?.pertanyaan === 'string' ? soal.pertanyaan : '',
     opsi: opsi.map((o) => (typeof o?.opsi === 'string' ? o.opsi : '').replace(LABEL_OPSI, '')),
     kunci: kunci === -1 ? null : kunci,
@@ -84,10 +97,14 @@ function keEditor(soal) {
     pembahasan: typeof soal?.pembahasan === 'string' ? soal.pembahasan : '',
     ringkasan: typeof soal?.ringkasan === 'string' ? soal.ringkasan : '',
   }
+  item._hashAsli = tandaTanganSoal(item)
+  return item
 }
 
 function keApi(soal) {
   return {
+    ...(soal.idSoal ? { idSoal: soal.idSoal } : {}),
+    diubah: !soal.idSoal || soal._hashAsli !== tandaTanganSoal(soal),
     pertanyaan: soal.pertanyaan.trim(),
     difficulty: soal.difficulty,
     targetTime: Number(soal.targetTime),
@@ -105,14 +122,12 @@ export async function ambilSoalKuis(idKuis) {
   return payload.data.map(keEditor)
 }
 
-// Menimpa seluruh soal milik kuis. Editor selalu mengirim daftar lengkap,
-// jadi backend tidak perlu melacak soal mana yang ditambah atau dihapus.
-export async function simpanSoalKuis(idKuis, daftarSoal) {
+export async function simpanSoalKuis(idKuis, daftarSoal, hapusIdSoal = []) {
   const payload = await panggil(`/kuis/${idKuis}/soal`, {
     method: 'PUT',
-    body: { soal: daftarSoal.map(keApi) },
+    body: { soal: daftarSoal.map(keApi), hapusIdSoal },
   })
-  return payload.data
+  return (payload.data || []).map(keEditor)
 }
 
 // ── Pengerjaan kuis mahasiswa ──
