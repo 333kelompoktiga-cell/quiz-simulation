@@ -9,7 +9,7 @@ import { siapkanPengaturanAcak, jumlahSoalDikerjakan } from '../utils/acakSoal.j
 // pembuat:User(nama) = nama dosen pembuat lewat FK Kuis.idUser, supaya daftar kuis
 // dalam satu bab bisa dibedakan ("Kuis 1 - Dosen A", "Kuis 1 - Dosen B").
 const KUIS_COLUMNS =
-  'idKuis, idUser, idBab, judul, deskripsi, durasi, acakSoal, jumlahTampil, tanggalDibuat, pin, aksesKelola, dosenPengelola, pembuat:User(nama)';
+  'idKuis, idUser, idBab, judul, deskripsi, durasi, maksPercobaan, acakSoal, jumlahTampil, tanggalDibuat, pin, aksesKelola, dosenPengelola, pembuat:User(nama)';
 
 // Password kuis dibuat otomatis oleh server saat kuis dibuat (lihat utils/passwordKuis.js):
 // tepat 8 karakter ASCII yang bisa dicetak (huruf besar/kecil, angka, simbol), tanpa spasi.
@@ -56,12 +56,12 @@ export const getAllKuis = async (req, res) => {
 
     const idKuis = data.map((kuis) => kuis.idKuis);
     const riwayatPerKuis = new Map();
+    const percobaanPerKuis = new Map();
     if (idKuis.length) {
       const { data: riwayat, error: riwayatError } = await supabaseAdmin
         .from('PengerjaanKuis')
-        .select('idPengerjaan, idKuis, skorFuzzy, kategoriFuzzy, akurasi, waktuSelesai')
+        .select('idPengerjaan, idKuis, status, skorFuzzy, kategoriFuzzy, akurasi, waktuSelesai')
         .eq('idUser', req.currentUser.id)
-        .eq('status', 'selesai')
         .in('idKuis', idKuis)
         .order('waktuSelesai', { ascending: false });
 
@@ -69,12 +69,18 @@ export const getAllKuis = async (req, res) => {
         return res.status(500).json(errorResponse({ message: riwayatError.message }));
       }
       for (const hasil of riwayat || []) {
-        if (!riwayatPerKuis.has(hasil.idKuis)) riwayatPerKuis.set(hasil.idKuis, hasil);
+        const ringkasan = percobaanPerKuis.get(hasil.idKuis) || { jumlah: 0, aktif: false };
+        ringkasan.jumlah += 1;
+        ringkasan.aktif ||= hasil.status === 'berlangsung';
+        percobaanPerKuis.set(hasil.idKuis, ringkasan);
+        if (hasil.status === 'selesai' && !riwayatPerKuis.has(hasil.idKuis)) riwayatPerKuis.set(hasil.idKuis, hasil);
       }
     }
 
     const daftar = data.map(({ Soal, ...kuis }) => {
       const hasilTerakhir = riwayatPerKuis.get(kuis.idKuis);
+      const percobaan = percobaanPerKuis.get(kuis.idKuis) || { jumlah: 0, aktif: false };
+      const sisaPercobaan = Math.max(0, kuis.maksPercobaan - percobaan.jumlah);
       const jumlahSoal = Soal[0]?.count ?? 0;
       const tersedia = kuis.pin !== null && jumlahSoal > 0;
       return {
@@ -84,6 +90,10 @@ export const getAllKuis = async (req, res) => {
         jumlahSoalTampil: jumlahSoalDikerjakan(kuis, jumlahSoal),
         tersedia,
         status: tersedia ? 'terbit' : 'draf',
+        jumlahPercobaan: percobaan.jumlah,
+        sisaPercobaan,
+        adaPercobaanAktif: percobaan.aktif,
+        bisaMengerjakan: jumlahSoal > 0 && (percobaan.aktif || (tersedia && sisaPercobaan > 0)),
         nilaiTerakhir: hasilTerakhir?.skorFuzzy ?? null,
         kategoriTerakhir: hasilTerakhir?.kategoriFuzzy ?? null,
         akurasiTerakhir: hasilTerakhir?.akurasi ?? null,
@@ -125,7 +135,10 @@ export const createKuis = async (req, res) => {
   try {
     // Saat kuis pertama kali dibuat (mis. saat klik Tambah Soal), pin bernilai null (status Draf).
     // Password baru dibuat saat kuis di-submit / simpan soal (publish / generatePin).
-    const { idBab, judul, deskripsi, durasi, generatePin, publish } = req.body;
+    const { idBab, judul, deskripsi, durasi, maksPercobaan = 1, generatePin, publish } = req.body;
+    if (!Number.isInteger(maksPercobaan) || maksPercobaan < 1 || maksPercobaan > 3) {
+      return res.status(400).json(errorResponse({ message: 'maksPercobaan harus bilangan bulat 1 sampai 3.' }));
+    }
 
     if (!idBab || !judul || !judul.trim()) {
       return res.status(400).json(errorResponse({ message: 'idBab dan judul wajib diisi.' }));
@@ -141,6 +154,7 @@ export const createKuis = async (req, res) => {
       judul: judul.trim(),
       deskripsi: deskripsi ?? null,
       pin: generatePin === true || publish === true ? buatPasswordKuis() : null,
+      maksPercobaan,
       ...acak.data,
     };
     if (durasi !== undefined && durasi !== null) {
@@ -177,11 +191,12 @@ export const updateKuis = async (req, res) => {
     const { id } = req.params;
     // generatePin: true = buat password baru (dipakai tombol "Generate" di pop-up password).
     // publish: true = terbitkan kuis dengan men-generate password jika belum punya password.
-    const { idBab, judul, deskripsi, durasi, pin, generatePin, publish, acakSoal, jumlahTampil } = req.body;
+    const { idBab, judul, deskripsi, durasi, pin, generatePin, publish, acakSoal, jumlahTampil, maksPercobaan } = req.body;
 
     if (idBab === undefined && judul === undefined && deskripsi === undefined
       && durasi === undefined && pin === undefined && generatePin === undefined
-      && publish === undefined && acakSoal === undefined && jumlahTampil === undefined) {
+      && publish === undefined && acakSoal === undefined && jumlahTampil === undefined
+      && maksPercobaan === undefined) {
       return res.status(400).json(errorResponse({ message: 'Tidak ada data yang diubah.' }));
     }
 
@@ -205,6 +220,12 @@ export const updateKuis = async (req, res) => {
     if (acak.error) return res.status(400).json(errorResponse({ message: acak.error }));
 
     const updatePayload = { ...acak.data };
+    if (maksPercobaan !== undefined) {
+      if (!Number.isInteger(maksPercobaan) || maksPercobaan < 1 || maksPercobaan > 3) {
+        return res.status(400).json(errorResponse({ message: 'maksPercobaan harus bilangan bulat 1 sampai 3.' }));
+      }
+      updatePayload.maksPercobaan = maksPercobaan;
+    }
     if (judul !== undefined) {
       if (!judul.trim()) {
         return res.status(400).json(errorResponse({ message: 'Judul tidak boleh kosong.' }));

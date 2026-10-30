@@ -135,7 +135,7 @@ export const mulaiPengerjaan = async (req, res) => {
 
     const { data: kuisDb, error: kuisError } = await supabaseAdmin
       .from('Kuis')
-      .select('idKuis, judul, durasi, pin, acakSoal, jumlahTampil, bab:Bab(namaBab, urutanBab)')
+      .select('idKuis, judul, durasi, maksPercobaan, pin, acakSoal, jumlahTampil, bab:Bab(namaBab, urutanBab)')
       .eq('idKuis', idKuis)
       .maybeSingle();
     if (kuisError) return dbError(res, kuisError, 'Gagal memeriksa kuis.');
@@ -190,36 +190,20 @@ export const mulaiPengerjaan = async (req, res) => {
         return res.status(403).json(errorResponse({ message: 'PIN kuis salah.', code: 'PIN_SALAH' }));
       }
 
-      const { count, error: countError } = await supabaseAdmin
-        .from('PengerjaanKuis')
-        .select('idPengerjaan', { count: 'exact', head: true })
-        .eq('idUser', req.currentUser.id)
-        .eq('idKuis', idKuis);
-      if (countError) return dbError(res, countError, 'Gagal menghitung percobaan kuis.');
-
       const { data: created, error: insertError } = await supabaseAdmin
-        .from('PengerjaanKuis')
-        .insert({
-          idUser: req.currentUser.id,
-          idKuis,
-          attempt: (count || 0) + 1,
-          // Soal dipilih & diacak sekali di sini, supaya tetap sama saat halaman di-refresh,
-          // dan penilaian/pembahasan memakai soal yang sama dengan yang dikerjakan.
-          urutanSoal: pilihSoalPengerjaan({ acakSoal, jumlahTampil }, questions),
-          score: 0,
-          waktuMulai: new Date().toISOString(),
-          status: 'berlangsung',
-          skorFuzzy: 0,
-          kategoriFuzzy: 'Belum dievaluasi',
-          totalSoal: 0,
-          totalBenar: 0,
-          totalSalah: 0,
-          akurasi: 0,
-          rataRataWaktu: 0,
-          durasiPengerjaan: 0,
+        .rpc('mulai_pengerjaan_kuis', {
+          p_id_user: req.currentUser.id,
+          p_id_kuis: idKuis,
+          p_urutan_soal: pilihSoalPengerjaan({ acakSoal, jumlahTampil }, questions),
         })
         .select('idPengerjaan, attempt, status, urutanSoal, waktuMulai')
         .single();
+      if (insertError?.code === 'P0001') {
+        return res.status(403).json(errorResponse({
+          message: 'Jatah percobaan kuis Anda sudah habis.',
+          code: 'BATAS_PERCOBAAN_TERCAPAI',
+        }));
+      }
       if (insertError) return dbError(res, insertError, 'Gagal memulai pengerjaan kuis.');
       attempt = created;
     }

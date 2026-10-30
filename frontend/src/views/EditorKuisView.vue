@@ -52,7 +52,7 @@ const acakAktif = computed(() => bisaAcak.value && info.value.acakSoal)
 const metode = ref('manual')
 
 const daftarBab = ref([])
-const info = ref({ judul: '', idBab: null, deskripsi: '', durasi: 30, acakSoal: false, jumlahTampil: MIN_TAMPIL })
+const info = ref({ judul: '', idBab: null, deskripsi: '', durasi: 30, maksPercobaan: 1, acakSoal: false, jumlahTampil: MIN_TAMPIL })
 const daftarSoal = ref([soalKosong()])
 const indeksAktif = ref(0)
 
@@ -135,6 +135,7 @@ function buatPayloadKuis(jumlahSoalValid) {
     idBab: info.value.idBab,
     deskripsi: info.value.deskripsi.trim() || null,
     durasi: info.value.durasi,
+    maksPercobaan: info.value.maksPercobaan,
     // Di bawah 20 soal opsi acak soal dimatikan; urutan soal tetap diacak oleh backend.
     acakSoal: bolehAcak,
     jumlahTampil: bolehAcak ? info.value.jumlahTampil : null,
@@ -289,6 +290,7 @@ onMounted(async () => {
         idBab: kuis.idBab,
         deskripsi: kuis.deskripsi ?? '',
         durasi: kuis.durasi ?? 30,
+        maksPercobaan: kuis.maksPercobaan ?? 1,
         acakSoal: kuis.acakSoal === true,
         jumlahTampil: kuis.jumlahTampil ?? MIN_TAMPIL,
       }
@@ -489,6 +491,7 @@ async function simpanDokumen() {
         idBab: info.value.idBab,
         deskripsi: null,
         durasi: info.value.durasi,
+        maksPercobaan: info.value.maksPercobaan,
       })
       idKuisTersimpan.value = kuis.idKuis
     }
@@ -508,6 +511,7 @@ async function simpanDokumen() {
         judul: info.value.judul.trim(),
         idBab: info.value.idBab,
         durasi: info.value.durasi,
+        maksPercobaan: info.value.maksPercobaan,
         publish: true,
       })
 
@@ -681,6 +685,17 @@ async function simpanDokumen() {
                   class="bg-wf-card border border-wf-border rounded-md p-4 text-[17px] leading-6 focus:outline-none focus:ring-2 focus:ring-wf-brand"
                 />
                 <span class="text-[13px] text-wf-muted">Lama pengerjaan seluruh kuis, berlaku untuk semua soal.</span>
+              </label>
+
+              <label class="flex flex-col gap-2 w-full sm:w-[360px] mt-1">
+                <span class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">MAKSIMAL PERCOBAAN</span>
+                <select
+                  v-model.number="info.maksPercobaan"
+                  class="bg-wf-card border border-wf-border rounded-md p-4 text-[17px] focus:outline-none focus:ring-2 focus:ring-wf-brand"
+                >
+                  <option v-for="jumlah in 3" :key="jumlah" :value="jumlah">{{ jumlah }} kali</option>
+                </select>
+                <span class="text-[13px] text-wf-muted">Jatah masing-masing mahasiswa untuk kuis ini.</span>
               </label>
 
               <div class="flex flex-col gap-2 mt-1">
@@ -973,6 +988,15 @@ async function simpanDokumen() {
               step="1"
               class="border border-wf-border rounded-md p-4 text-[17px] leading-6 focus:outline-none focus:ring-2 focus:ring-wf-brand"
             />
+          </label>
+          <label class="flex flex-col gap-2 w-full sm:w-[200px]">
+            <span class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">MAKSIMAL PERCOBAAN</span>
+            <select
+              v-model.number="info.maksPercobaan"
+              class="bg-wf-card border border-wf-border rounded-md p-4 text-[17px] leading-6 focus:outline-none focus:ring-2 focus:ring-wf-brand"
+            >
+              <option v-for="jumlah in 3" :key="jumlah" :value="jumlah">{{ jumlah }} kali</option>
+            </select>
           </label>
         </div>
 
