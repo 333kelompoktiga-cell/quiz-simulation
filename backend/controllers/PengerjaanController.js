@@ -22,7 +22,7 @@ function difficultyLabel(value) {
 async function getOwnedAttempt(idPengerjaan, idUser) {
   const { data, error } = await supabaseAdmin
     .from('PengerjaanKuis')
-    .select('idPengerjaan, idUser, idKuis, attempt, status, urutanSoal, waktuMulai, waktuSelesai, score, skorFuzzy, kategoriFuzzy, totalSoal, totalBenar, totalSalah, akurasi, rataRataWaktu, durasiPengerjaan, rekomendasi, distribusiTingkat, distribusiKesulitan, hasilDetail')
+    .select('idPengerjaan, idUser, idKuis, attempt, status, urutanSoal, soalTerakhir, waktuMulai, waktuSelesai, score, skorFuzzy, kategoriFuzzy, totalSoal, totalBenar, totalSalah, akurasi, rataRataWaktu, durasiPengerjaan, rekomendasi, distribusiTingkat, distribusiKesulitan, hasilDetail')
     .eq('idPengerjaan', idPengerjaan)
     .eq('idUser', idUser)
     .maybeSingle();
@@ -161,7 +161,7 @@ export const mulaiPengerjaan = async (req, res) => {
 
     let { data: attempt, error: attemptError } = await supabaseAdmin
       .from('PengerjaanKuis')
-      .select('idPengerjaan, attempt, status, urutanSoal, waktuMulai')
+      .select('idPengerjaan, attempt, status, urutanSoal, soalTerakhir, waktuMulai')
       .eq('idUser', req.currentUser.id)
       .eq('idKuis', idKuis)
       .eq('status', 'berlangsung')
@@ -196,7 +196,7 @@ export const mulaiPengerjaan = async (req, res) => {
           p_id_kuis: idKuis,
           p_urutan_soal: pilihSoalPengerjaan({ acakSoal, jumlahTampil }, questions),
         })
-        .select('idPengerjaan, attempt, status, urutanSoal, waktuMulai')
+        .select('idPengerjaan, attempt, status, urutanSoal, soalTerakhir, waktuMulai')
         .single();
       if (insertError?.code === 'P0001') {
         return res.status(403).json(errorResponse({
@@ -262,8 +262,22 @@ export const simpanJawaban = async (req, res) => {
       return res.status(409).json(errorResponse({ message: 'Pengerjaan sudah selesai dan tidak dapat diubah.' }));
     }
 
-    const saved = await validateAndSaveAnswers(res, attempt, req.body?.jawaban);
+    const soalTerakhir = req.body?.soalTerakhir;
+    if (soalTerakhir !== undefined) {
+      const { data: questions, error: questionsError } = await getAttemptQuestions(attempt);
+      if (questionsError) return dbError(res, questionsError, 'Gagal memeriksa posisi soal.');
+      if (!uuidValid(soalTerakhir) || !questions.some((question) => question.idSoal === soalTerakhir)) {
+        return res.status(400).json(errorResponse({ message: 'soalTerakhir harus ID soal dalam pengerjaan ini.' }));
+      }
+    }
+    const saved = await validateAndSaveAnswers(res, attempt, req.body?.jawaban ?? []);
     if (saved === null) return undefined;
+    if (soalTerakhir !== undefined) {
+      const { data: updated, error: progressError } = await supabaseAdmin.from('PengerjaanKuis')
+        .update({ soalTerakhir }).eq('idPengerjaan', idPengerjaan).eq('status', 'berlangsung').select('idPengerjaan').maybeSingle();
+      if (progressError) return dbError(res, progressError, 'Gagal menyimpan posisi soal.');
+      if (!updated) return res.status(409).json(errorResponse({ message: 'Pengerjaan sudah selesai.' }));
+    }
     return res.json(successResponse({
       message: 'Jawaban tersimpan.',
       data: { idPengerjaan, jumlahJawabanTersimpan: saved },

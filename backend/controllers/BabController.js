@@ -1,3 +1,5 @@
+import { ROLE } from '../config/roles.js';
+import { listOptions, pagination, searchPattern } from '../utils/listQuery.js';
 // controllers/BabController.js
 import { supabaseAdmin } from '../config/db.js';
 import { successResponse, errorResponse } from '../models/apiResponse.js';
@@ -28,17 +30,22 @@ const tanganiUniqueViolation = (res, error, namaBab, urutanBab) => {
 // Diurutkan dari bab pertama, bukan dari yang terbaru dibuat.
 export const getAllBab = async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
-      .from('Bab')
-      .select(BAB_COLUMNS)
-      .order('urutanBab', { ascending: true });
+    const paged = req.currentUser.role === ROLE.SUPER_ADMIN;
+    let options;
+    try { options = listOptions(req.query); } catch (error) { return res.status(400).json(errorResponse({ message: error.message })); }
+    let query = supabaseAdmin.from('Bab').select(BAB_COLUMNS, { count: 'exact' })
+      .order('urutanBab', { ascending: true }).order('idBab', { ascending: true });
+    if (options.search) query = query.ilike('namaBab', searchPattern(options.search));
+    if (req.query.dibuatOleh) query = query.eq('dibuatOleh', req.query.dibuatOleh);
+    if (paged) query = query.range(options.from, options.to);
+    const { data, error, count } = await query;
 
     if (error) {
       return res.status(500).json(errorResponse({ message: error.message }));
     }
 
     return res.json(
-      successResponse({ message: 'Berhasil mengambil daftar bab.', data }),
+      { ...successResponse({ message: 'Berhasil mengambil daftar bab.', data }), ...(paged && { pagination: pagination(options, count) }) },
     );
   } catch (error) {
     return res.status(500).json(errorResponse({ message: error.message || 'Gagal mengambil daftar bab.' }));

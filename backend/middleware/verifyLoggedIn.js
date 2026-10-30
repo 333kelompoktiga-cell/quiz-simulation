@@ -1,3 +1,4 @@
+import { sessionId } from '../utils/loginSession.js';
 // middleware/verifyLoggedIn.js
 import { supabase, supabaseAdmin } from '../config/db.js';
 import { errorResponse } from '../models/apiResponse.js';
@@ -32,7 +33,7 @@ export const verifyLoggedIn = async (req, res, next) => {
     // 3. Pastikan ada sesi aktif — lastLogin terisi dan logoutTime masih NULL
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('SessionLogin')
-      .select('lastLogin, logoutTime')
+      .select('lastLogin, logoutTime, sessionId')
       .eq('idAkun', userData.user.id)
       .maybeSingle();
 
@@ -40,7 +41,7 @@ export const verifyLoggedIn = async (req, res, next) => {
       return res.status(500).json(errorResponse({ message: sessionError.message || 'Gagal memeriksa status sesi.' }));
     }
 
-    if (!session || !session.lastLogin || session.logoutTime !== null) {
+    if (!session || !session.lastLogin || session.logoutTime !== null || !sessionId(token) || session.sessionId !== sessionId(token)) {
       return res.status(401).json(errorResponse({ message: 'Sesi tidak aktif. Silakan login terlebih dahulu.' }));
     }
 
