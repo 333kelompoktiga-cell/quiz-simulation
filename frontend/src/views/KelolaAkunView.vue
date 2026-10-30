@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminHeader from '../components/AdminHeader.vue'
 import { SessionExpiredError } from '../services/auth'
@@ -17,6 +17,8 @@ const errorMsg = ref('')
 const infoMsg = ref('')
 const cari = ref('')
 const filterRole = ref('semua')
+const AKUN_PER_HALAMAN = 10
+const halamanAktif = ref(1)
 
 const akunTersaring = computed(() => {
   const kata = cari.value.trim().toLowerCase()
@@ -25,6 +27,29 @@ const akunTersaring = computed(() => {
       (filterRole.value === 'semua' || a.role === filterRole.value) &&
       (!kata || a.nama.toLowerCase().includes(kata) || a.email.toLowerCase().includes(kata)),
   )
+})
+
+const totalHalaman = computed(() => Math.max(1, Math.ceil(akunTersaring.value.length / AKUN_PER_HALAMAN)))
+
+const akunHalamanIni = computed(() => {
+  const mulai = (halamanAktif.value - 1) * AKUN_PER_HALAMAN
+  return akunTersaring.value.slice(mulai, mulai + AKUN_PER_HALAMAN)
+})
+
+const indeksAwalAkun = computed(() =>
+  akunTersaring.value.length === 0 ? 0 : (halamanAktif.value - 1) * AKUN_PER_HALAMAN + 1,
+)
+
+const indeksAkhirAkun = computed(() =>
+  Math.min(halamanAktif.value * AKUN_PER_HALAMAN, akunTersaring.value.length),
+)
+
+watch([cari, filterRole], () => {
+  halamanAktif.value = 1
+})
+
+watch(totalHalaman, (maks) => {
+  if (halamanAktif.value > maks) halamanAktif.value = maks
 })
 
 function jumlahRole(role) {
@@ -201,7 +226,7 @@ async function handleHapus(akun) {
         </div>
 
         <article
-          v-for="akun in akunTersaring"
+          v-for="akun in akunHalamanIni"
           :key="akun.id"
           class="bg-wf-card border border-wf-border-subtle rounded-md px-6 py-5 flex flex-wrap items-center gap-x-6 gap-y-3"
         >
@@ -222,6 +247,35 @@ async function handleHapus(akun) {
             <button type="button" @click="handleHapus(akun)" class="tombol-aksi-bahaya">Hapus</button>
           </div>
         </article>
+
+        <!-- Navigasi halaman (tampil jika akun lebih dari 10) -->
+        <nav
+          v-if="akunTersaring.length > AKUN_PER_HALAMAN"
+          aria-label="Navigasi halaman akun"
+          class="mt-2 flex flex-wrap items-center justify-between gap-4 border-t border-wf-border-subtle pt-4"
+        >
+          <p class="font-mono text-[14px] text-wf-secondary">
+            Menampilkan {{ indeksAwalAkun }}–{{ indeksAkhirAkun }} dari {{ akunTersaring.length }} akun · Halaman {{ halamanAktif }} dari {{ totalHalaman }}
+          </p>
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              :disabled="halamanAktif <= 1"
+              @click="halamanAktif--"
+              class="rounded-xl border border-wf-brand-border bg-wf-card px-4 py-2.5 text-[16px] font-semibold text-wf-brand hover:bg-wf-brand-soft disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Sebelumnya
+            </button>
+            <button
+              type="button"
+              :disabled="halamanAktif >= totalHalaman"
+              @click="halamanAktif++"
+              class="rounded-xl border border-wf-brand-border bg-wf-card px-4 py-2.5 text-[16px] font-semibold text-wf-brand hover:bg-wf-brand-soft disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Berikutnya
+            </button>
+          </div>
+        </nav>
       </section>
     </main>
 
