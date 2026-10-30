@@ -67,9 +67,11 @@ const kuisLain = ref(null)
 // Kalau kuis sudah terbuat tapi soalnya gagal tersimpan, percobaan
 // berikutnya cukup memperbarui kuis itu, bukan membuat kuis kembar.
 const idKuisTersimpan = ref(props.id)
+const idSoalDihapus = ref([])
 
 function soalKosong() {
   return {
+    idSoal: null,
     pertanyaan: '',
     opsi: ['', '', '', '', ''],
     kunci: null,
@@ -191,16 +193,23 @@ async function tambahSoal() {
     }
 
     // Simpan soal yang sudah diisi ke Supabase
-    await simpanSoalKuis(idKuisTersimpan.value, daftarDicek)
+    const soalTersimpan = await simpanSoalKuis(idKuisTersimpan.value, daftarDicek, idSoalDihapus.value)
+    idSoalDihapus.value = []
+    daftarSoal.value = [...soalTersimpan, soalKosong()]
 
-    const jumlahTersimpan = daftarDicek.length
-    if (!akhirKosong) {
+    const jumlahTersimpan = soalTersimpan.length
+    if (false && !akhirKosong) {
       daftarSoal.value.push(soalKosong())
     }
     indeksAktif.value = daftarSoal.value.length - 1
     sudahCobaSimpan.value = false
     snapshotAwal.value = snapshot()
-    infoMsg.value = `Soal berhasil disimpan sementara (${jumlahTersimpan} soal tersimpan). Silakan isi soal berikutnya, atau klik "SIMPAN KUIS" jika sudah selesai agar kuis dapat dikerjakan oleh mahasiswa.`
+    const tambahanKolaborator = jumlahTersimpan - daftarDicek.length
+    const infoKolab =
+      tambahanKolaborator > 0
+        ? ` (${tambahanKolaborator} soal dari dosen kolaborator yang menyimpan lebih dulu ikut dimuat, sehingga soal Anda tersimpan di nomor ${jumlahTersimpan}).`
+        : '.'
+    infoMsg.value = `Soal berhasil disimpan sementara (${jumlahTersimpan} soal tersimpan)${infoKolab} Silakan isi Soal ${daftarSoal.value.length}, atau klik "SIMPAN KUIS" jika sudah selesai agar kuis dapat dikerjakan oleh mahasiswa.`
   } catch (err) {
     tanganiError(err)
   } finally {
@@ -216,14 +225,19 @@ function selanjutnya() {
 async function hapusSoalAktif() {
   if (daftarSoal.value.length === 1 || menyimpan.value || menyimpanSoal.value) return
   if (!window.confirm(`Hapus soal ${indeksAktif.value + 1}?`)) return
-  daftarSoal.value.splice(indeksAktif.value, 1)
+  const [dihapus] = daftarSoal.value.splice(indeksAktif.value, 1)
+  if (dihapus?.idSoal) idSoalDihapus.value.push(dihapus.idSoal)
   indeksAktif.value = Math.min(indeksAktif.value, daftarSoal.value.length - 1)
 
   if (idKuisTersimpan.value) {
     const soalValid = daftarSoal.value.filter((s) => !masalahSoal(s))
     if (soalValid.length > 0) {
       try {
-        await simpanSoalKuis(idKuisTersimpan.value, soalValid)
+        const soalTersimpan = await simpanSoalKuis(idKuisTersimpan.value, soalValid, idSoalDihapus.value)
+        idSoalDihapus.value = []
+        const adaSlotKosong = daftarSoal.value.some((s) => isSoalKosong(s))
+        daftarSoal.value = adaSlotKosong ? [...soalTersimpan, soalKosong()] : soalTersimpan.length ? soalTersimpan : [soalKosong()]
+        indeksAktif.value = Math.min(indeksAktif.value, daftarSoal.value.length - 1)
         snapshotAwal.value = snapshot()
       } catch (err) {
         tanganiError(err)
@@ -362,7 +376,9 @@ async function simpan() {
       idKuisTersimpan.value = kuis.idKuis
     }
 
-    await simpanSoalKuis(idKuisTersimpan.value, dataSoal)
+    const soalTersimpan = await simpanSoalKuis(idKuisTersimpan.value, dataSoal, idSoalDihapus.value)
+    idSoalDihapus.value = []
+    daftarSoal.value = soalTersimpan
 
     // Generate password (pin) sehingga kuis berstatus Terbit (published)
     const kuisTerbit = await ubahKuis(idKuisTersimpan.value, {
@@ -372,7 +388,7 @@ async function simpan() {
 
     bersih.value = true
     const infoPin = kuisTerbit?.pin ? ` Password kuis: ${kuisTerbit.pin}.` : ''
-    setNotice(`Kuis "${dataKuis.judul}" berhasil disimpan dan diterbitkan dengan ${dataSoal.length} soal.${infoPin}`)
+    setNotice(`Kuis "${dataKuis.judul}" berhasil disimpan dan diterbitkan dengan ${soalTersimpan.length} soal.${infoPin}`)
     router.push(`/bab/${dataKuis.idBab}/kuis`)
   } catch (err) {
     if (err instanceof EndpointBelumAdaError) {

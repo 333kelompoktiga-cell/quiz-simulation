@@ -148,7 +148,7 @@ export const getSoalKuis = async (req, res) => {
 export const simpanSoalKuis = async (req, res) => {
   try {
     const { idKuis } = req.params;
-    const { soal } = req.body;
+    const { soal, hapusIdSoal } = req.body;
 
     if (!Array.isArray(soal)) {
       return res.status(400).json(errorResponse({ message: 'Body harus berisi daftar soal: { "soal": [...] }.' }));
@@ -160,7 +160,12 @@ export const simpanSoalKuis = async (req, res) => {
       if (error) {
         return res.status(400).json(errorResponse({ message: `Soal ${i + 1}: ${error}` }));
       }
-      daftar.push(data);
+      const itemSoal = soal[i] ?? {};
+      daftar.push({
+        ...data,
+        idSoal: typeof itemSoal.idSoal === 'string' && itemSoal.idSoal.trim() ? itemSoal.idSoal.trim() : null,
+        diubah: itemSoal.diubah !== false,
+      });
     }
 
     const akses = await cekAksesKuis(idKuis, req.currentUser.id);
@@ -170,7 +175,127 @@ export const simpanSoalKuis = async (req, res) => {
 
     // Hapus soal lama + simpan soal baru dijalankan dalam satu transaksi di database
     // (fungsi simpan_soal_kuis). Kalau ada yang gagal, soal lama tetap utuh.
-    const { error: rpcError } = await supabaseAdmin.rpc('simpan_soal_kuis', { p_id_kuis: idKuis, p_soal: daftar });
+    const { data: soalDbLama, error: lamaError } = await urutkanSoal(
+      supabaseAdmin.from('Soal').select('idSoal, urutan').eq('idKuis', idKuis),
+    );
+    if (lamaError) {
+      return res.status(500).json(errorResponse({ message: lamaError.message }));
+    }
+
+    const idMilikKuis = new Set((soalDbLama || []).map((s) => s.idSoal));
+    const daftarHapus = Array.isArray(hapusIdSoal)
+      ? hapusIdSoal.filter((id) => typeof id === 'string' && idMilikKuis.has(id))
+      : [];
+
+    if (daftarHapus.length > 0) {
+      const { count, error: countError } = await supabaseAdmin
+        .from('JawabanMahasiswa')
+        .select('idJawaban', { count: 'exact', head: true })
+        .in('idSoal', daftarHapus);
+      if (countError) {
+        return res.status(500).json(errorResponse({ message: countError.message }));
+      }
+      if (count > 0) {
+        return res.status(409).json(
+          errorResponse({ message: 'Soal yang sudah pernah dijawab mahasiswa tidak bisa dihapus.' }),
+        );
+      }
+      const { error: delOpsiErr } = await supabaseAdmin.from('OpsiJawaban').delete().in('idSoal', daftarHapus);
+      if (delOpsiErr) {
+        return res.status(500).json(errorResponse({ message: delOpsiErr.message }));
+      }
+      const { error: delSoalErr } = await supabaseAdmin.from('Soal').delete().in('idSoal', daftarHapus);
+      if (delSoalErr) {
+        return res.status(500).json(errorResponse({ message: delSoalErr.message }));
+      }
+    }
+
+    const hapusSet = new Set(daftarHapus);
+    const urutanTersisa = (soalDbLama || [])
+      .map((s) => s.idSoal)
+      .filter((id) => !hapusSet.has(id));
+    const setTersisa = new Set(urutanTersisa);
+    const idSoalBaru = [];
+
+    for (const item of daftar) {
+      const { idSoal, diubah, opsi, ...kolomSoal } = item;
+
+      if (idSoal && setTersisa.has(idSoal)) {
+        if (diubah) {
+          const { error: updErr } = await supabaseAdmin
+            .from('Soal')
+            .update(kolomSoal)
+            .eq('idSoal', idSoal);
+          if (updErr) {
+            return res.status(500).json(errorResponse({ message: updErr.message || 'Gagal memperbarui soal.' }));
+          }
+
+          const { data: opsiLama, error: opsiLamaErr } = await supabaseAdmin
+            .from('OpsiJawaban')
+            .select('idOpsi')
+            .eq('idSoal', idSoal);
+          if (opsiLamaErr) {
+            return res.status(500).json(errorResponse({ message: opsiLamaErr.message }));
+          }
+
+          const { data: opsiBaru, error: insOpsiErr } = await supabaseAdmin
+            .from('OpsiJawaban')
+            .insert(opsi.map((o) => ({ ...o, idSoal })))
+            .select('idOpsi');
+          if (insOpsiErr) {
+            return res.status(500).json(errorResponse({ message: insOpsiErr.message || 'Gagal menyimpan opsi jawaban.' }));
+          }
+
+          if (opsiLama?.length) {
+            const { error: delOldErr } = await supabaseAdmin
+              .from('OpsiJawaban')
+              .delete()
+              .in('idOpsi', opsiLama.map((o) => o.idOpsi));
+            if (delOldErr) {
+              await supabaseAdmin.from('OpsiJawaban').delete().in('idOpsi', opsiBaru.map((o) => o.idOpsi));
+              if (delOldErr.code === '23503') {
+                return res.status(409).json(
+                  errorResponse({ message: 'Opsi jawaban tidak bisa diganti karena soal ini sudah pernah dijawab mahasiswa.' }),
+                );
+              }
+              return res.status(500).json(errorResponse({ message: delOldErr.message }));
+            }
+          }
+        }
+      } else if (!idSoal) {
+        const urutanSementara = urutanTersisa.length + idSoalBaru.length + 1;
+        const { data: dibuat, error: insSoalErr } = await supabaseAdmin
+          .from('Soal')
+          .insert({ ...kolomSoal, idKuis, urutan: urutanSementara })
+          .select('idSoal')
+          .single();
+        if (insSoalErr) {
+          return res.status(500).json(errorResponse({ message: insSoalErr.message || 'Gagal menambah soal baru.' }));
+        }
+
+        const { error: insOpsiErr } = await supabaseAdmin
+          .from('OpsiJawaban')
+          .insert(opsi.map((o) => ({ ...o, idSoal: dibuat.idSoal })));
+        if (insOpsiErr) {
+          await supabaseAdmin.from('Soal').delete().eq('idSoal', dibuat.idSoal);
+          return res.status(500).json(errorResponse({ message: insOpsiErr.message || 'Gagal menyimpan opsi soal baru.' }));
+        }
+
+        idSoalBaru.push(dibuat.idSoal);
+      }
+    }
+
+    const urutanFinal = [...urutanTersisa, ...idSoalBaru];
+    await Promise.all(
+      urutanFinal.map((id, idx) =>
+        supabaseAdmin
+          .from('Soal')
+          .update({ urutan: idx + 1 })
+          .eq('idSoal', id),
+      ),
+    );
+
+    const rpcError = null;
 
     if (rpcError) {
       // 23503 = foreign key violation — soal lama sudah dijawab mahasiswa (JawabanMahasiswa)
