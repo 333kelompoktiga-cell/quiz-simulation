@@ -593,8 +593,6 @@ async function simpanDokumen() {
       >
         <p v-if="!modeEdit" class="-mt-1 text-[14px] leading-normal text-wf-secondary">
           Tambahkan pertanyaan, pilihan jawaban, jawaban benar, dan pembahasan.
-          Rumus matematika dibatasi $ ... $ (inline) atau $$ ... $$ (blok); ketik
-          <code>\frac</code> untuk pecahan.
         </p>
 
         <!-- Info panduan penyimpanan untuk dosen -->
@@ -606,6 +604,9 @@ async function simpanDokumen() {
             </li>
             <li>
               Klik <b>SIMPAN KUIS</b> jika semua soal sudah selesai dibuat. Kuis akan <b>diterbitkan beserta password-nya</b> sehingga <b>langsung bisa dikerjakan oleh mahasiswa</b>.
+            </li>
+            <li>
+              Jika ingin <b>mengubah Nama Kuis</b> atau <b>memindahkannya ke Bab lain</b>, cukup ganti kolom <b>Nama Kuis</b> atau <b>Bab</b> di bawah ini lalu klik <b>+ Tambah Soal</b> atau <b>SIMPAN KUIS</b> (perubahan otomatis memperbarui kuis yang sama di database tanpa membuat kuis ganda).
             </li>
           </ul>
         </div>
