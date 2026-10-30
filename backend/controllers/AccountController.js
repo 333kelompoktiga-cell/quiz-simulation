@@ -1,3 +1,4 @@
+import { listOptions, pagination } from '../utils/listQuery.js';
 // controllers/AccountController.js
 import { supabaseAdmin } from '../config/db.js';
 import { successResponse, errorResponse } from '../models/apiResponse.js';
@@ -9,54 +10,21 @@ const VALID_ROLES = [ROLE.ADMIN, ROLE.MAHASISWA];
 // Menampilkan semua user (role admin & user) — gabungan dari auth.users (id, email) dan public.user (nama, role)
 export const getAllUsers = async (req, res) => {
   try {
-    // Ambil data profil dari public.user
-    const { data: profiles, error: profileError } = await supabaseAdmin
-      .from('User')
-      .select('idUser, nama, role')
-      .in('role', VALID_ROLES);
-
-    if (profileError) {
-      return res.status(500).json(errorResponse({ message: profileError.message }));
-    }
-
-    // auth.users tidak bisa diquery lewat PostgREST biasa, jadi pakai Admin API
-    let allAuthUsers = [];
-    let page = 1;
-    const perPage = 1000;
-
-    while (true) {
-      const { data: authPage, error: authError } = await supabaseAdmin.auth.admin.listUsers({
-        page,
-        perPage,
-      });
-
-      if (authError) {
-        return res.status(500).json(errorResponse({ message: authError.message }));
-      }
-
-      allAuthUsers = allAuthUsers.concat(authPage.users);
-
-      if (authPage.users.length < perPage) break;
-      page += 1;
-    }
-
-    const authMap = new Map(allAuthUsers.map((u) => [u.id, u.email]));
-
-    // Gabungkan berdasarkan id
-    const users = profiles
-      .filter((profile) => authMap.has(profile.idUser))
-      .map((profile) => ({
-        id: profile.idUser,
-        nama: profile.nama,
-        email: authMap.get(profile.idUser),
-        role: profile.role,
-      }));
-
+    let options;
+    try { options = listOptions(req.query); } catch (error) { return res.status(400).json(errorResponse({ message: error.message })); }
+    if (req.query.role && !VALID_ROLES.includes(req.query.role)) return res.status(400).json(errorResponse({ message: 'Role tidak valid.' }));
+    const { data: result, error } = await supabaseAdmin.rpc('list_accounts_superadmin', {
+      p_search: options.search, p_role: req.query.role || null,
+      p_offset: options.from, p_limit: options.limit,
+    });
+    if (error) return res.status(500).json(errorResponse({ message: error.message }));
+    const users = result.users;
+    const total = result.total;
     return res.json(
-      successResponse({
+      { ...successResponse({
         message: 'Berhasil mengambil daftar user.',
         data: users,
-      }),
+      }), pagination: pagination(options, total) },
     );
   } catch (error) {
     return res.status(500).json(

@@ -1,3 +1,4 @@
+import { listOptions, pagination, searchPattern } from '../utils/listQuery.js';
 // controllers/KuisController.js
 import { supabaseAdmin } from '../config/db.js';
 import { successResponse, errorResponse } from '../models/apiResponse.js';
@@ -37,18 +38,24 @@ const keRespons = ({ pin, pembuat, ...kuis }, user) => {
 export const getAllKuis = async (req, res) => {
   try {
     const { idBab } = req.query;
+    const paged = req.currentUser.role === ROLE.SUPER_ADMIN;
+    let options;
+    try { options = listOptions(req.query); } catch (error) { return res.status(400).json(errorResponse({ message: error.message })); }
 
     // Soal(count) = jumlah soal per kuis, ditampilkan frontend di daftar kuis ("· 10 soal").
     let query = supabaseAdmin
       .from('Kuis')
-      .select(`${KUIS_COLUMNS}, Soal(count)`)
-      .order('tanggalDibuat', { ascending: false });
+      .select(`${KUIS_COLUMNS}, Soal(count)`, { count: 'exact' })
+      .order('tanggalDibuat', { ascending: false }).order('idKuis', { ascending: true });
 
     if (idBab) {
       query = query.eq('idBab', idBab);
     }
 
-    const { data, error } = await query;
+    if (options.search) query = query.ilike('judul', searchPattern(options.search));
+    if (req.query.idUser) query = query.eq('idUser', req.query.idUser);
+    if (paged) query = query.range(options.from, options.to);
+    const { data, error, count } = await query;
 
     if (error) {
       return res.status(500).json(errorResponse({ message: error.message }));
@@ -56,6 +63,7 @@ export const getAllKuis = async (req, res) => {
 
     const idKuis = data.map((kuis) => kuis.idKuis);
     const riwayatPerKuis = new Map();
+    const riwayatPerKuisAktif = new Map();
     const percobaanPerKuis = new Map();
     if (idKuis.length) {
       const { data: riwayat, error: riwayatError } = await supabaseAdmin
@@ -70,6 +78,7 @@ export const getAllKuis = async (req, res) => {
       }
       for (const hasil of riwayat || []) {
         const ringkasan = percobaanPerKuis.get(hasil.idKuis) || { jumlah: 0, aktif: false };
+        if (hasil.status === 'berlangsung') riwayatPerKuisAktif.set(hasil.idKuis, hasil.idPengerjaan);
         ringkasan.jumlah += 1;
         ringkasan.aktif ||= hasil.status === 'berlangsung';
         percobaanPerKuis.set(hasil.idKuis, ringkasan);
@@ -98,12 +107,13 @@ export const getAllKuis = async (req, res) => {
         kategoriTerakhir: hasilTerakhir?.kategoriFuzzy ?? null,
         akurasiTerakhir: hasilTerakhir?.akurasi ?? null,
         idPengerjaanTerakhir: hasilTerakhir?.idPengerjaan ?? null,
+        idPengerjaanAktif: riwayatPerKuisAktif.get(kuis.idKuis) ?? null,
         statusBelajar: hasilTerakhir ? 'Selesai' : tersedia ? 'Tersedia' : 'Belum dibuka',
       };
     });
 
     return res.json(
-      successResponse({ message: 'Berhasil mengambil daftar kuis.', data: daftar }),
+      { ...successResponse({ message: 'Berhasil mengambil daftar kuis.', data: daftar }), ...(paged && { pagination: pagination(options, count) }) },
     );
   } catch (error) {
     return res.status(500).json(errorResponse({ message: error.message || 'Gagal mengambil daftar kuis.' }));
