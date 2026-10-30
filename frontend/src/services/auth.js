@@ -19,7 +19,7 @@ const AMBANG_PERBARUI_DETIK = 120
 
 // Batas waktu tidak aktif (idle) sebelum sesi otomatis logout (dalam detik).
 // Ubah nilai ini jika ingin mengganti durasi idle timeout (saat ini: 10 menit / 600 detik).
-export const BATAS_IDLE_DETIK = 10 * 60
+export const BATAS_IDLE_DETIK = 600
 const LAST_ACTIVE_KEY = 'last_active_at'
 
 function labelDurasiIdle() {
@@ -211,7 +211,7 @@ export function saveSession(data) {
 
 export function clearSession() {
   hentikanTimerIdle()
-  ;[TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY, USER_KEY, LAST_ACTIVE_KEY].forEach((k) => localStorage.removeItem(k))
+    ;[TOKEN_KEY, REFRESH_KEY, EXPIRES_KEY, USER_KEY, LAST_ACTIVE_KEY].forEach((k) => localStorage.removeItem(k))
 }
 
 export function getToken() {
@@ -273,7 +273,7 @@ async function jalankanLogoutIdle() {
   try {
     const token = getToken()
     if (token) {
-      await kirim('/auth/logout', { token }).catch(() => {})
+      await kirim('/auth/logout', { token }).catch(() => { })
     }
   } finally {
     clearSession()
