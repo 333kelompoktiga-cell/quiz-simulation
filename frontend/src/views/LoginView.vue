@@ -74,14 +74,14 @@ async function handleForgotPassword() {
       <img :src="logoImage" alt="eSikap" class="mx-auto mb-6 h-10 w-[125px] object-contain" />
 
       <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8">
-        <p class="text-xs font-semibold tracking-widest text-gray-500 uppercase">Masuk</p>
+        <p class="text-xs font-semibold tracking-widest text-gray-600 uppercase">Masuk</p>
         <h1 class="text-2xl font-semibold text-gray-900 mt-1 mb-6">Halo, Selamat Datang!</h1>
 
         <form @submit.prevent="handleSubmit" class="space-y-4" novalidate>
           <div>
             <label
               for="email"
-              class="block text-xs font-semibold tracking-wide text-gray-500 uppercase mb-1"
+              class="block text-xs font-semibold tracking-wide text-gray-600 uppercase mb-1"
             >
               Email
             </label>
@@ -102,7 +102,7 @@ async function handleForgotPassword() {
           <div>
             <label
               for="password"
-              class="block text-xs font-semibold tracking-wide text-gray-500 uppercase mb-1"
+              class="block text-xs font-semibold tracking-wide text-gray-600 uppercase mb-1"
             >
               Password
             </label>
@@ -149,7 +149,7 @@ async function handleForgotPassword() {
           <p class="text-xs font-semibold text-gray-700">
             {{ mengirimReset ? 'MENGIRIM...' : 'LUPA PASSWORD?' }}
           </p>
-          <p class="text-xs text-gray-500 mt-0.5">Klik untuk kirim tautan reset ke email Anda</p>
+          <p class="text-xs text-gray-600 mt-0.5">Klik untuk kirim tautan reset ke email Anda</p>
         </button>
       </div>
 

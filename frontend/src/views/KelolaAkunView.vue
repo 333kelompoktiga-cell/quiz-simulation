@@ -179,7 +179,7 @@ async function handleHapus(akun) {
             class="px-2 py-1 rounded-md border text-[17px] font-semibold tracking-[0.5px]"
             :class="
               filterRole === opsi.nilai
-                ? 'bg-wf-ok border-wf-brand-border text-white'
+                ? 'bg-wf-brand border-wf-brand text-white'
                 : 'bg-wf-brand-soft border-wf-brand-border text-wf-text'
             "
           >
