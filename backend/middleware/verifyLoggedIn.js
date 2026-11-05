@@ -33,7 +33,7 @@ export const verifyLoggedIn = async (req, res, next) => {
     // 3. Pastikan ada sesi aktif — lastLogin terisi dan logoutTime masih NULL
     const { data: session, error: sessionError } = await supabaseAdmin
       .from('SessionLogin')
-      .select('lastLogin, logoutTime, sessionId')
+      .select('lastLogin, logoutTime, sessionId, lastActive')
       .eq('idAkun', userData.user.id)
       .maybeSingle();
 
@@ -43,6 +43,31 @@ export const verifyLoggedIn = async (req, res, next) => {
 
     if (!session || !session.lastLogin || session.logoutTime !== null || !sessionId(token) || session.sessionId !== sessionId(token)) {
       return res.status(401).json(errorResponse({ message: 'Sesi tidak aktif. Silakan login terlebih dahulu.' }));
+    }
+
+    // 4. Deteksi idle timeout (10 menit / 600 detik tanpa aktivitas)
+    const waktuAktifTerakhir = new Date(session.lastActive || session.lastLogin).getTime();
+    const detikIdle = (Date.now() - waktuAktifTerakhir) / 1000;
+    if (detikIdle > 600) {
+      await supabaseAdmin.from('SessionLogin')
+        .update({ logoutTime: new Date().toISOString() })
+        .eq('idAkun', userData.user.id)
+        .eq('sessionId', session.sessionId);
+
+      return res.status(401).json(errorResponse({
+        message: 'Sesi Anda telah berakhir karena tidak ada aktivitas selama 10 menit. Silakan login kembali.',
+        code: 'SESSION_IDLE_TIMEOUT',
+      }));
+    }
+
+    // Perbarui lastActive secara hemat (throttled minimal 60 detik)
+    if (detikIdle >= 60) {
+      supabaseAdmin.from('SessionLogin')
+        .update({ lastActive: new Date().toISOString() })
+        .eq('idAkun', userData.user.id)
+        .eq('sessionId', session.sessionId)
+        .then(() => {})
+        .catch(() => {});
     }
 
     req.currentUser = { id: userData.user.id, email: userData.user.email, ...profile };

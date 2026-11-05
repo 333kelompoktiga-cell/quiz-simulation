@@ -314,8 +314,15 @@ export function mulaiPantauIdle(onIdleLogout) {
     catatAktivitasPengguna()
   }
 
+  const intervalHeartbeat = window.setInterval(() => {
+    if (isLoggedIn() && (Date.now() - terakhirCatatAktivitas) < 3 * 60 * 1000) {
+      void fetchMe().catch(() => {})
+    }
+  }, 3 * 60 * 1000)
+
   return () => {
     hentikanTimerIdle()
+    window.clearInterval(intervalHeartbeat)
     EVENT_AKTIVITAS.forEach((evt) => window.removeEventListener(evt, handler))
   }
 }
