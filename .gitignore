@@ -8,3 +8,4 @@ docs/migrations/
 generate_test_cases_excel.py
 docs/Test_Case_eSIKAP_MultiRole_Updated.xlsx
 .vscode
+.gitignore
