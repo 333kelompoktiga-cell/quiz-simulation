@@ -72,16 +72,47 @@ export const login = async (req, res) => {
       );
     }
 
-    // Claim atomically: a concurrent login must not replace the current device.
     const idSession = sessionId(data.session.access_token);
-    const { data: claimed, error: sessionError } = idSession
-      ? await supabaseAdmin.rpc('claim_login_session', { p_id_akun: data.user.id, p_session_id: idSession })
-      : { error: new Error('Token tidak memiliki session_id.') };
-    if (sessionError || !claimed) {
+    if (!idSession) {
       await supabaseAdmin.auth.admin.signOut(data.session.access_token, 'local');
-      return res.status(sessionError ? 500 : 409).json(errorResponse({
-        message: sessionError ? 'Gagal mencatat sesi login.' : 'Akun masih login di perangkat lain. Logout dari perangkat tersebut terlebih dahulu.',
-        code: sessionError ? 'SESSION_ERROR' : 'AKUN_SEDANG_LOGIN',
+      return res.status(500).json(errorResponse({ message: 'Token tidak memiliki session_id.' }));
+    }
+
+    // 1. Cek apakah akun ini sebelumnya memiliki sesi aktif di perangkat lain
+    const { data: previousSession } = await supabaseAdmin
+      .from('SessionLogin')
+      .select('sessionId, logoutTime, lastActive')
+      .eq('idAkun', data.user.id)
+      .maybeSingle();
+
+    const hadActiveSession = Boolean(
+      previousSession &&
+      previousSession.logoutTime === null &&
+      previousSession.sessionId &&
+      previousSession.sessionId !== idSession
+    );
+
+    // 2. Cabut sesi lain di Supabase Auth (scope 'others') agar token perangkat lama segera invalid
+    await supabaseAdmin.auth.admin.signOut(data.session.access_token, 'others').catch((err) => {
+      console.warn('Gagal mencabut sesi lain di Supabase Auth:', err?.message);
+    });
+
+    // 3. Catat sesi baru perangkat ini ke tabel SessionLogin (menimpa sesi perangkat sebelumnya)
+    const { error: sessionError } = await supabaseAdmin
+      .from('SessionLogin')
+      .upsert({
+        idAkun: data.user.id,
+        sessionId: idSession,
+        lastLogin: new Date().toISOString(),
+        lastActive: new Date().toISOString(),
+        logoutTime: null,
+      }, { onConflict: 'idAkun' });
+
+    if (sessionError) {
+      await supabaseAdmin.auth.admin.signOut(data.session.access_token, 'local');
+      return res.status(500).json(errorResponse({
+        message: 'Gagal mencatat sesi login.',
+        code: 'SESSION_ERROR',
       }));
     }
 
@@ -92,7 +123,7 @@ export const login = async (req, res) => {
           token: data.session.access_token,
           refresh_token: data.session.refresh_token,
           expires_at: data.session.expires_at,
-          previous_session_ended: false,
+          previous_session_ended: hadActiveSession,
           user: {
             id_user: data.user.id,
             email: data.user.email,
@@ -344,7 +375,10 @@ export const refresh = async (req, res) => {
     if (activeError) return res.status(500).json(errorResponse({ message: 'Gagal memeriksa sesi.' }));
     if (!active || active.sessionId !== sessionId(data.session.access_token)) {
       await supabaseAdmin.auth.admin.signOut(data.session.access_token, 'local');
-      return res.status(401).json(errorResponse({ message: 'Sesi sudah berakhir. Silakan login kembali.' }));
+      return res.status(401).json(errorResponse({
+        message: 'Akun Anda telah login di perangkat lain. Sesi di perangkat ini telah diakhiri.',
+        code: 'SESSION_SUPERSEDED',
+      }));
     }
 
     const waktuAktifTerakhir = new Date(active.lastActive || active.lastLogin).getTime();

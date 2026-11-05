@@ -41,8 +41,15 @@ export const verifyLoggedIn = async (req, res, next) => {
       return res.status(500).json(errorResponse({ message: sessionError.message || 'Gagal memeriksa status sesi.' }));
     }
 
-    if (!session || !session.lastLogin || session.logoutTime !== null || !sessionId(token) || session.sessionId !== sessionId(token)) {
+    if (!session || !session.lastLogin || session.logoutTime !== null || !sessionId(token)) {
       return res.status(401).json(errorResponse({ message: 'Sesi tidak aktif. Silakan login terlebih dahulu.' }));
+    }
+
+    if (session.sessionId !== sessionId(token)) {
+      return res.status(401).json(errorResponse({
+        message: 'Akun Anda telah login di perangkat lain. Sesi di perangkat ini telah diakhiri.',
+        code: 'SESSION_SUPERSEDED',
+      }));
     }
 
     // 4. Deteksi idle timeout (10 menit / 600 detik tanpa aktivitas)
