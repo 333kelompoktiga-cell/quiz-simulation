@@ -360,19 +360,6 @@ export const refresh = async (req, res) => {
       .update({ lastActive: new Date().toISOString() })
       .eq('idAkun', data.user.id).eq('sessionId', active.sessionId);
 
-    const waktuAktifTerakhir = new Date(active.lastActive || active.lastLogin).getTime();
-    if ((Date.now() - waktuAktifTerakhir) / 1000 > 600) {
-      await supabaseAdmin.from('SessionLogin')
-        .update({ logoutTime: new Date().toISOString() })
-        .eq('idAkun', data.user.id).eq('sessionId', active.sessionId);
-      await supabaseAdmin.auth.admin.signOut(data.session.access_token, 'local');
-      return res.status(401).json(errorResponse({ message: 'Sesi sudah berakhir karena tidak ada aktivitas selama 10 menit. Silakan login kembali.' }));
-    }
-
-    await supabaseAdmin.from('SessionLogin')
-      .update({ lastActive: new Date().toISOString() })
-      .eq('idAkun', data.user.id).eq('sessionId', active.sessionId);
-    }
 
     return res.json(
       successResponse({
