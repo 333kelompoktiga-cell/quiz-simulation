@@ -145,7 +145,7 @@ onMounted(() => {
             </div>
 
             <p class="mt-1 text-[13px] leading-5 text-wf-secondary">{{ item.ringkasan }}</p>
-            <p v-if="item.deskripsi" class="mt-1 text-[12px] text-wf-secondary/80">Cakupan: {{ item.deskripsi }}</p>
+            <p v-if="item.deskripsi" class="mt-1 text-[12px] text-wf-secondary font-medium">Cakupan: {{ item.deskripsi }}</p>
             <p class="mt-1 text-[12px] font-medium text-wf-brand">
               Progres: {{ item.selesaiCount }} dari {{ item.totalKuis }} kuis diselesaikan
               <span v-if="item.jumlahTahap > 0">· {{ item.jumlahTahap }} tahap belajar disiapkan AI</span>

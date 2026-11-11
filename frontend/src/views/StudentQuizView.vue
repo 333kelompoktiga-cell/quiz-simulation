@@ -287,8 +287,15 @@ onMounted(async () => {
   loading.value = true
   errorMsg.value = ''
   try {
-    // Jika sesi pengerjaan masih aktif (mis. saat halaman di-refresh/F5 atau
-    // klik LANJUTKAN), muat langsung lembar soal aktif tanpa meminta PIN ulang.
+    const sesiPin = sessionStorage.getItem(kunciSesiPin(props.id))
+    if (!sesiPin) {
+      const infoKuis = await ambilKuis(props.id).catch(() => null)
+      if (infoKuis) kuis.value = infoKuis
+      if (infoKuis?.adaPin) {
+        tampilPin.value = true
+        return
+      }
+    }
     await mulaiKuis()
   } catch (err) {
     if (err instanceof SessionExpiredError) {
@@ -420,11 +427,14 @@ onBeforeUnmount(() => window.clearInterval(timerId))
     </main>
 
     <!-- ════════ POP-UP PIN ════════ -->
-    <div v-if="tampilPin" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div
+      v-if="tampilPin"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="judul-pin"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    >
       <form
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="judul-pin"
         class="w-full max-w-[440px] bg-wf-card border border-wf-border-subtle rounded-xl p-6 flex flex-col gap-5 shadow-lg"
         @submit.prevent="verifikasiPin"
       >

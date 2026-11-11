@@ -153,7 +153,7 @@ onMounted(() => {
             </div>
             <div class="rounded-lg bg-wf-page px-3 py-2 border border-wf-border-subtle">
               <span class="text-wf-secondary">Soal Belum Tepat: </span>
-              <strong :class="roadmapData.totalSoalSalah > 0 ? 'text-amber-600' : 'text-emerald-600'">
+              <strong :class="roadmapData.totalSoalSalah > 0 ? 'text-amber-800' : 'text-emerald-800'">
                 {{ roadmapData.totalSoalSalah }} butir
               </strong>
             </div>

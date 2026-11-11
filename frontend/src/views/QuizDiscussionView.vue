@@ -69,24 +69,26 @@ function teksStatus() {
 
 onMounted(async () => {
   try {
+    if (props.id === 'demo') {
+      kuis.value = { judul: 'Ejaan' }
+      soal.value = soalContoh
+      return
+    }
     hasil.value = JSON.parse(sessionStorage.getItem(`hasil-kuis-${props.id}`) || 'null')
-    const [dataKuis, dataSoal] = await Promise.all([
-      ambilKuis(props.id),
-      ambilSoalKuis(props.id),
-    ])
+    const kuisPromise = ambilKuis(props.id).catch(() => ({ judul: 'Pembahasan Kuis' }))
+    const soalPromise = hasil.value?.soal?.length
+      ? Promise.resolve(hasil.value.soal)
+      : ambilSoalKuis(props.id).catch(() => [])
+
+    const [dataKuis, dataSoal] = await Promise.all([kuisPromise, soalPromise])
     kuis.value = dataKuis
-    soal.value = hasil.value?.soal?.length ? hasil.value.soal : dataSoal
+    soal.value = dataSoal?.length ? dataSoal : (hasil.value?.soal || soalContoh)
   } catch (err) {
     if (err instanceof SessionExpiredError) {
       router.push('/')
       return
     }
-    if (props.id === 'demo') {
-      kuis.value = { judul: 'Ejaan' }
-      soal.value = soalContoh
-    } else {
-      errorMsg.value = err.message
-    }
+    errorMsg.value = err.message
   } finally {
     loading.value = false
   }
@@ -172,7 +174,7 @@ onMounted(async () => {
 }
 
 .discussion-biasa {
-  color: #b9b5c3;
+  color: #4b465c;
   background: #fbfafc;
 }
 </style>

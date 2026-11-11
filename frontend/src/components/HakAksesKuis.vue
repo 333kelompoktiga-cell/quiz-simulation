@@ -44,8 +44,8 @@ async function simpan() {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="tutup">
-    <form role="dialog" aria-modal="true" aria-labelledby="judul-hak-akses"
+  <div role="dialog" aria-modal="true" aria-labelledby="judul-hak-akses" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="tutup">
+    <form
       class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-wf-card p-6 shadow-lg flex flex-col gap-5"
       @submit.prevent="simpan">
       <h2 id="judul-hak-akses" class="text-[22px] font-semibold">Hak Akses — {{ kuis.judul }}</h2>

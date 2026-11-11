@@ -282,14 +282,14 @@ async function handleHapus(akun) {
     <!-- Dialog tambah akun -->
     <div
       v-if="formulir"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="judul-dialog-akun"
       class="fixed inset-0 z-20 bg-black/40 overflow-y-auto p-4 flex"
       @click.self="formulir = null"
     >
       <form
         @submit.prevent="simpanFormulir"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="judul-dialog-akun"
         class="m-auto w-full max-w-lg bg-wf-card rounded-xl p-6 flex flex-col gap-4 shadow-xl"
         novalidate
       >

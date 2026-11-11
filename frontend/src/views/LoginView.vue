@@ -65,13 +65,13 @@ async function handleForgotPassword() {
 </script>
 
 <template>
-  <div
+  <main
     class="min-h-screen w-full flex items-center justify-center bg-cover bg-center relative px-4 py-10"
     :style="{ backgroundImage: `url(${bgImage})` }"
   >
 
     <div class="relative z-10 w-full max-w-md">
-      <img :src="logoImage" alt="eSikap" class="mx-auto mb-6 h-10 w-[125px] object-contain" />
+      <img :src="logoImage" alt="eSikap" width="125" height="40" fetchpriority="high" class="mx-auto mb-6 h-10 w-[125px] object-contain" />
 
       <div class="bg-white/90 backdrop-blur-sm rounded-2xl shadow-xl p-8">
         <p class="text-xs font-semibold tracking-widest text-gray-600 uppercase">Masuk</p>
@@ -120,7 +120,7 @@ async function handleForgotPassword() {
               <button
                 type="button"
                 @click="lihatPassword = !lihatPassword"
-                :aria-label="lihatPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+                :aria-label="lihatPassword ? 'Sembunyi password' : 'Lihat password'"
                 class="absolute inset-y-0 right-0 px-4 text-xs font-semibold text-purple-700 hover:text-purple-900"
               >
                 {{ lihatPassword ? 'SEMBUNYI' : 'LIHAT' }}
@@ -158,5 +158,5 @@ async function handleForgotPassword() {
         &copy; {{ new Date().getFullYear() }} Quiz Simulation
       </p>
     </div>
-  </div>
+  </main>
 </template>
