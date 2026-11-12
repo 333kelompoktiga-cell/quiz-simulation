@@ -1,7 +1,6 @@
 // services/soalImageExtractor.js
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const jpeg = require('../../performance report/node_modules/jpeg-js');
+import jpeg from 'jpeg-js';
+import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { supabaseAdmin } from '../config/db.js';
 import { BUCKET_GAMBAR_SOAL, urlGambarSoal } from './gambarSoalService.js';
 
@@ -9,7 +8,6 @@ import { BUCKET_GAMBAR_SOAL, urlGambarSoal } from './gambarSoalService.js';
 // Setiap gambar rumus dikonversi menjadi buffer JPEG berkualitas tinggi dan diunggah ke Supabase Storage.
 export async function extractImagesFromPdf(pdfBuffer, startPage = 1, endPage = 9999) {
   try {
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
     const uint8 = new Uint8Array(pdfBuffer);
     const doc = await pdfjs.getDocument({ data: uint8 }).promise;
 
@@ -25,7 +23,7 @@ export async function extractImagesFromPdf(pdfBuffer, startPage = 1, endPage = 9
         if (ops.fnArray[j] === pdfjs.OPS.paintImageXObject) {
           const objId = ops.argsArray[j][0];
           try {
-            const img = await new Promise((resolve, reject) => {
+            const img = await new Promise((resolve) => {
               const timer = setTimeout(() => resolve(null), 2000);
               page.objs.get(objId, (data) => {
                 clearTimeout(timer);
@@ -92,4 +90,3 @@ export async function extractImagesFromPdf(pdfBuffer, startPage = 1, endPage = 9
     return new Map();
   }
 }
-
