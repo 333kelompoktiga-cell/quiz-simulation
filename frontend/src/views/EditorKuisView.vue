@@ -16,6 +16,7 @@ import {
   ambilSoalKuis,
   simpanSoalKuis,
   importSoalPdf,
+  uploadGambarSoal,
 } from '../services/kuis'
 import pencilIcon from '../assets/icons/pencil.svg'
 import fileIcon from '../assets/icons/file.svg'
@@ -73,12 +74,50 @@ function soalKosong() {
   return {
     idSoal: null,
     pertanyaan: '',
+    gambar: null,
+    gambarUrl: null,
     opsi: ['', '', '', '', ''],
     kunci: null,
     difficulty: 'Sedang',
     targetTime: 60,
     pembahasan: '',
     ringkasan: '',
+  }
+}
+
+const mengunggahGambar = ref(false)
+
+async function handleUploadGambar(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  const MAKS_UKURAN = 5 * 1024 * 1024 // 5 MB
+  if (file.size > MAKS_UKURAN) {
+    errorMsg.value = 'Ukuran file gambar maksimal 5 MB.'
+    event.target.value = ''
+    return
+  }
+
+  mengunggahGambar.value = true
+  errorMsg.value = ''
+  try {
+    const hasil = await uploadGambarSoal(file)
+    if (soal.value) {
+      soal.value.gambar = hasil.path
+      soal.value.gambarUrl = hasil.url
+    }
+  } catch (err) {
+    errorMsg.value = err.message || 'Gagal mengunggah gambar soal.'
+  } finally {
+    mengunggahGambar.value = false
+    event.target.value = ''
+  }
+}
+
+function hapusGambarSoal() {
+  if (soal.value) {
+    soal.value.gambar = null
+    soal.value.gambarUrl = null
   }
 }
 
@@ -704,6 +743,70 @@ async function simpanDokumen() {
                 placeholder="Tulis pertanyaan di sini."
                 class="w-full field-sizing-content min-h-32 resize-y bg-wf-card border border-wf-border rounded-md p-4 text-[17px] leading-6 focus:outline-none focus:ring-2 focus:ring-wf-brand"
               ></textarea>
+
+              <!-- Unggah Gambar Soal (Opsional) -->
+              <div class="flex flex-col gap-2 mt-1">
+                <!-- Keadaan 1: Belum ada gambar -->
+                <div v-if="!soal.gambar" class="flex flex-wrap items-center gap-3">
+                  <label
+                    class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-wf-border bg-wf-page px-4 py-2.5 text-[14px] font-semibold text-wf-text transition hover:border-wf-brand hover:bg-wf-brand-soft hover:text-wf-brand shadow-xs"
+                    :class="{ 'opacity-60 pointer-events-none': mengunggahGambar }"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="size-4 text-wf-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>{{ mengunggahGambar ? 'Mengunggah...' : '+ Tambah Gambar Soal' }}</span>
+                    <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" :disabled="mengunggahGambar" @change="handleUploadGambar" />
+                  </label>
+                  <span class="text-xs text-wf-muted">Opsional (rumus, grafik, ilustrasi). Format: PNG, JPG, WEBP (maks. 5MB)</span>
+                </div>
+
+                <!-- Keadaan 2: Gambar sudah terpasang -->
+                <div v-else class="flex flex-col gap-3 rounded-xl border border-wf-border bg-wf-page/60 p-4 shadow-xs max-w-2xl">
+                  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-wf-border/60 pb-3">
+                    <div class="flex items-center gap-2">
+                      <span class="inline-flex size-6 items-center justify-center rounded-full bg-wf-brand-soft text-wf-brand">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </span>
+                      <span class="text-[14px] font-semibold text-wf-text">Gambar Soal Terlampir</span>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                      <!-- Tombol Ganti Gambar -->
+                      <label
+                        class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-wf-border bg-wf-card px-3 py-1.5 text-[13px] font-semibold text-wf-secondary transition hover:border-wf-brand hover:bg-wf-brand-soft hover:text-wf-brand shadow-xs"
+                        :class="{ 'opacity-60 pointer-events-none': mengunggahGambar }"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 text-wf-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>{{ mengunggahGambar ? 'Mengunggah...' : 'Ganti Gambar' }}</span>
+                        <input type="file" accept="image/png,image/jpeg,image/webp" class="hidden" :disabled="mengunggahGambar" @change="handleUploadGambar" />
+                      </label>
+
+                      <!-- Tombol Hapus Gambar (Button Berwarna Merah) -->
+                      <button
+                        type="button"
+                        @click="hapusGambarSoal"
+                        class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-wf-no-border bg-red-50 px-3 py-1.5 text-[13px] font-semibold text-wf-no transition hover:bg-red-100 hover:border-red-400 shadow-xs"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="size-3.5 text-wf-no" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Hapus Gambar</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Pratinjau Gambar -->
+                  <div v-if="soal.gambarUrl" class="flex items-center justify-center rounded-lg border border-wf-border/70 bg-white p-3">
+                    <img :src="soal.gambarUrl" alt="Pratinjau Gambar Soal" class="max-h-56 max-w-full rounded object-contain shadow-xs" />
+                  </div>
+                  <span class="text-[12px] text-wf-muted">Gambar ini akan tampil di lembar soal mahasiswa saat ujian dan pembahasan.</span>
+                </div>
+              </div>
 
               <label class="flex flex-col gap-2 w-full sm:w-[360px] mt-1">
                 <span class="font-mono text-[15px] leading-5 tracking-[1px] text-wf-secondary">DURASI (MENIT)</span>

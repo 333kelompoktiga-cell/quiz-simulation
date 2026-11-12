@@ -7,6 +7,7 @@ import {
   parseSoal,
   uploadSoalToSupabase,
 } from '../services/soalExtractor.js';
+import { extractImagesFromPdf } from '../services/soalImageExtractor.js';
 import { siapkanSoal, cekAksesKuis } from './SoalController.js';
 
 // Soal hasil import diperiksa dengan aturan yang sama seperti soal yang diisi manual
@@ -24,6 +25,7 @@ function periksaSoal(item) {
   const { error, data } = siapkanSoal(
     {
       pertanyaan: item.pertanyaan,
+      gambar: item.gambar ?? null,
       difficulty: item.difficulty,
       pembahasan: item.pembahasan,
       opsi: item.opsi_jawaban.map(({ opsi, isCorrect }) => ({ opsi, isCorrect })),
@@ -82,6 +84,23 @@ export async function importSoalFromPdf(req, res) {
           'Tidak ada soal yang terdeteksi. Pastikan PDF mengikuti Template Upload Soal e-Kuis '
           + '(kolom Pertanyaan / Stimulus Soal, Opsi Jawaban, Kunci Jawaban, Pembahasan).',
       });
+    }
+
+    // Ekstrak gambar tersemat dari PDF (jika ada) dan hubungkan ke tiap nomor soal
+    try {
+      const imageMap = await extractImagesFromPdf(req.file.buffer, startPage, endPage);
+      if (imageMap.size > 0) {
+        daftarSoal.forEach((item, idx) => {
+          // Cari gambar berdasarkan nomor halaman atau indeks soal
+          const pageImg = imageMap.get(startPage + idx) || imageMap.get(item.nomor);
+          if (pageImg) {
+            item.gambar = pageImg.filename;
+            item.gambarUrl = pageImg.url;
+          }
+        });
+      }
+    } catch (imgErr) {
+      console.warn('Gagal mengekstrak gambar saat import PDF:', imgErr.message);
     }
 
     const valid = [];

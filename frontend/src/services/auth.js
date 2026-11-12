@@ -317,7 +317,7 @@ export function mulaiPantauIdle(onIdleLogout) {
 
   const intervalHeartbeat = window.setInterval(() => {
     if (isLoggedIn() && (Date.now() - terakhirCatatAktivitas) < 3 * 60 * 1000) {
-      void fetchMe().catch(() => {})
+      void fetchMe().catch(() => { })
     }
   }, 3 * 60 * 1000)
 

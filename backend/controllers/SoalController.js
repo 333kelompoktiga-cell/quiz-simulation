@@ -4,8 +4,36 @@ import { supabaseAdmin } from '../config/db.js';
 import { bisaDikelola, KOLOM_AKSES_KUIS } from '../utils/aksesKuis.js';
 import { ROLE } from '../config/roles.js';
 import { successResponse, errorResponse } from '../models/apiResponse.js';
+import {
+  BUCKET_GAMBAR_SOAL,
+  urlGambarSoal,
+  deteksiJenisGambar,
+  UKURAN_MAKS_GAMBAR,
+} from '../services/gambarSoalService.js';
 
-// `opsi:OpsiJawaban(...)` = alias PostgREST, supaya di respons namanya `opsi` sesuai kontrak.
+let kolomGambarChecked = false;
+let kolomGambarAda = false;
+
+export async function cekKolomGambarSoal() {
+  if (kolomGambarChecked) return kolomGambarAda;
+  try {
+    const { error } = await supabaseAdmin.from('Soal').select('gambar').limit(1);
+    kolomGambarAda = !error;
+  } catch {
+    kolomGambarAda = false;
+  }
+  kolomGambarChecked = true;
+  return kolomGambarAda;
+}
+
+export const getSoalSelect = async () => {
+  const ada = await cekKolomGambarSoal();
+  return ada
+    ? 'idSoal, idKuis, urutan, pertanyaan, gambar, difficulty, targetTime, poin, pembahasan, ringkasan, opsi:OpsiJawaban(idOpsi, opsi, isCorrect)'
+    : 'idSoal, idKuis, urutan, pertanyaan, difficulty, targetTime, poin, pembahasan, ringkasan, opsi:OpsiJawaban(idOpsi, opsi, isCorrect)';
+};
+
+// Fallback jika dipanggil sinkron
 const SOAL_SELECT =
   'idSoal, idKuis, urutan, pertanyaan, difficulty, targetTime, poin, pembahasan, ringkasan, opsi:OpsiJawaban(idOpsi, opsi, isCorrect)';
 
@@ -60,6 +88,11 @@ export const siapkanSoal = (body, { wajibSemua }) => {
       data[field] = nilai;
     }
   }
+  if (kolomGambarAda && (body.gambar !== undefined || wajibSemua)) {
+    const nilai = teksAtauNull(body.gambar);
+    if (nilai === undefined) return { error: 'gambar harus berupa teks (path atau url).' };
+    data.gambar = nilai;
+  }
   if (ada('opsi')) {
     const { opsi } = body;
     if (!Array.isArray(opsi) || opsi.length < MIN_OPSI || opsi.length > MAX_OPSI) {
@@ -80,7 +113,14 @@ export const siapkanSoal = (body, { wajibSemua }) => {
 // jawabannya tidak bisa diintip lewat Network tab sebelum mengerjakan kuis.
 const keRespons = (soal, isAdmin) => {
   const opsi = [...soal.opsi].sort((a, b) => a.opsi.localeCompare(b.opsi));
-  const hasil = { ...soal, difficulty: ANGKA_KE_DIFFICULTY[soal.difficulty] ?? null, opsi };
+  const gambarUrl = urlGambarSoal(soal.gambar);
+  const hasil = {
+    ...soal,
+    gambar: soal.gambar ?? null,
+    gambarUrl,
+    difficulty: ANGKA_KE_DIFFICULTY[soal.difficulty] ?? null,
+    opsi,
+  };
   if (isAdmin) return hasil;
 
   const { pembahasan, ringkasan, ...sisa } = hasil;
@@ -127,7 +167,7 @@ export const getSoalKuis = async (req, res) => {
     }
 
     const { data, error } = await urutkanSoal(
-      supabaseAdmin.from('Soal').select(SOAL_SELECT).eq('idKuis', idKuis),
+      supabaseAdmin.from('Soal').select(await getSoalSelect()).eq('idKuis', idKuis),
     );
 
     if (error) {
@@ -308,7 +348,7 @@ export const simpanSoalKuis = async (req, res) => {
     }
 
     const { data, error } = await urutkanSoal(
-      supabaseAdmin.from('Soal').select(SOAL_SELECT).eq('idKuis', idKuis),
+      supabaseAdmin.from('Soal').select(await getSoalSelect()).eq('idKuis', idKuis),
     );
 
     if (error) {
@@ -333,7 +373,7 @@ export const getAllSoal = async (req, res) => {
   try {
     const { idKuis } = req.query;
 
-    let query = supabaseAdmin.from('Soal').select(SOAL_SELECT);
+    let query = supabaseAdmin.from('Soal').select(await getSoalSelect());
     if (idKuis) {
       query = query.eq('idKuis', idKuis);
     }
@@ -357,7 +397,7 @@ export const getSoalById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data, error } = await supabaseAdmin.from('Soal').select(SOAL_SELECT).eq('idSoal', id).single();
+    const { data, error } = await supabaseAdmin.from('Soal').select(await getSoalSelect()).eq('idSoal', id).single();
 
     if (error || !data) {
       return res.status(404).json(errorResponse({ message: 'Soal tidak ditemukan.' }));
@@ -408,7 +448,7 @@ export const createSoal = async (req, res) => {
       return res.status(500).json(errorResponse({ message: opsiError.message || 'Gagal menyimpan opsi jawaban.' }));
     }
 
-    const { data: hasil } = await supabaseAdmin.from('Soal').select(SOAL_SELECT).eq('idSoal', soal.idSoal).single();
+    const { data: hasil } = await supabaseAdmin.from('Soal').select(await getSoalSelect()).eq('idSoal', soal.idSoal).single();
 
     return res.status(201).json(successResponse({ message: 'Soal berhasil dibuat.', data: keRespons(hasil, true) }));
   } catch (error) {
@@ -503,7 +543,7 @@ export const updateSoal = async (req, res) => {
       }
     }
 
-    const { data: hasil, error } = await supabaseAdmin.from('Soal').select(SOAL_SELECT).eq('idSoal', id).single();
+    const { data: hasil, error } = await supabaseAdmin.from('Soal').select(await getSoalSelect()).eq('idSoal', id).single();
 
     if (error) {
       return res.status(500).json(errorResponse({ message: error.message }));
@@ -563,5 +603,50 @@ export const deleteSoal = async (req, res) => {
     return res.json(successResponse({ message: 'Soal berhasil dihapus.' }));
   } catch (error) {
     return res.status(500).json(errorResponse({ message: error.message || 'Gagal menghapus soal.' }));
+  }
+};
+
+// POST /api/soal/upload-gambar — mengunggah file gambar soal ke Supabase Storage (bucket gambar-soal)
+export const uploadGambarSoal = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json(errorResponse({ message: 'File gambar wajib diunggah pada field "gambar".' }));
+    }
+
+    if (req.file.size > UKURAN_MAKS_GAMBAR) {
+      return res.status(400).json(errorResponse({ message: 'Ukuran file gambar maksimal 5 MB.' }));
+    }
+
+    const jenis = deteksiJenisGambar(req.file.buffer);
+    if (!jenis) {
+      return res.status(400).json(errorResponse({ message: 'Format file tidak didukung. Gunakan JPG, PNG, atau WEBP.' }));
+    }
+
+    const namaFile = `soal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${jenis.ext}`;
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(BUCKET_GAMBAR_SOAL)
+      .upload(namaFile, req.file.buffer, {
+        contentType: jenis.mime,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      return res.status(500).json(errorResponse({ message: uploadError.message || 'Gagal mengunggah gambar ke storage.' }));
+    }
+
+    const url = urlGambarSoal(namaFile);
+
+    return res.json(
+      successResponse({
+        message: 'Gambar soal berhasil diunggah.',
+        data: {
+          path: namaFile,
+          url,
+        },
+      }),
+    );
+  } catch (error) {
+    return res.status(500).json(errorResponse({ message: error.message || 'Gagal memproses unggah gambar soal.' }));
   }
 };

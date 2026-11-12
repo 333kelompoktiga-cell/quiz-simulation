@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  ambilKuis,
   mulaiPengerjaanKuis,
   simpanJawabanPengerjaan,
   submitPengerjaanKuis,
@@ -364,6 +365,9 @@ onBeforeUnmount(() => window.clearInterval(timerId))
             </div>
           </div>
           <h2 class="mt-6 text-[18px] font-bold leading-6"><span class="whitespace-pre-line">{{ soalAktif.pertanyaan }}</span></h2>
+          <div v-if="soalAktif.gambarUrl" class="mt-4 rounded-xl border border-wf-border bg-white p-3 self-start">
+            <img :src="soalAktif.gambarUrl" alt="Gambar Soal" class="max-h-72 max-w-full rounded-lg object-contain" />
+          </div>
           <p class="mt-5 font-mono text-[15px] text-wf-secondary">Pilih salah satu:</p>
           <div class="mt-5 flex flex-col gap-3">
             <label

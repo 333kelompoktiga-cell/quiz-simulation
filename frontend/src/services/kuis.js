@@ -75,6 +75,7 @@ export function hurufOpsi(index) {
 function tandaTanganSoal(s) {
   return JSON.stringify({
     pertanyaan: (s?.pertanyaan ?? '').trim(),
+    gambar: (s?.gambar ?? '').trim(),
     opsi: Array.isArray(s?.opsi) ? s.opsi.map((o) => String(o ?? '').trim()) : [],
     kunci: s?.kunci ?? null,
     difficulty: s?.difficulty ?? 'Sedang',
@@ -90,6 +91,8 @@ function keEditor(soal) {
   const item = {
     idSoal: soal?.idSoal ?? null,
     pertanyaan: typeof soal?.pertanyaan === 'string' ? soal.pertanyaan : '',
+    gambar: soal?.gambar ?? null,
+    gambarUrl: soal?.gambarUrl ?? null,
     opsi: opsi.map((o) => (typeof o?.opsi === 'string' ? o.opsi : '').replace(LABEL_OPSI, '')),
     kunci: kunci === -1 ? null : kunci,
     difficulty: soal?.difficulty ?? 'Sedang',
@@ -106,6 +109,7 @@ function keApi(soal) {
     ...(soal.idSoal ? { idSoal: soal.idSoal } : {}),
     diubah: !soal.idSoal || soal._hashAsli !== tandaTanganSoal(soal),
     pertanyaan: soal.pertanyaan.trim(),
+    gambar: soal.gambar ? soal.gambar.trim() : null,
     difficulty: soal.difficulty,
     targetTime: Number(soal.targetTime),
     pembahasan: soal.pembahasan.trim() || null,
@@ -115,6 +119,22 @@ function keApi(soal) {
       isCorrect: i === soal.kunci,
     })),
   }
+}
+
+export async function uploadGambarSoal(file) {
+  const form = new FormData()
+  form.append('gambar', file)
+  const token = sessionStorage.getItem('access_token') || ''
+  const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/soal/upload-gambar`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: form,
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.message || 'Gagal mengunggah gambar soal.')
+  return data.data // { path, url }
 }
 
 export async function ambilSoalKuis(idKuis) {

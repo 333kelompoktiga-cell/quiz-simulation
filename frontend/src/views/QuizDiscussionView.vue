@@ -112,6 +112,9 @@ onMounted(async () => {
         </div>
 
         <h2 class="mt-6 text-[18px] font-bold leading-6">{{ soalAktif.pertanyaan }}</h2>
+        <div v-if="soalAktif.gambarUrl" class="mt-4 rounded-xl border border-wf-border bg-white p-3 self-start">
+          <img :src="soalAktif.gambarUrl" alt="Gambar Soal" class="max-h-72 max-w-full rounded-lg object-contain" />
+        </div>
 
         <div class="mt-5 flex flex-col gap-3">
           <div v-for="(opsi, index) in soalAktif.opsi" :key="opsi.idOpsi || opsi.opsi" class="discussion-option" :class="`discussion-${statusOpsi(index)}`">

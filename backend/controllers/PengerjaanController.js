@@ -4,6 +4,8 @@ import { evaluateQuiz } from '../services/fuzzyService.js';
 import { samaPassword } from '../utils/passwordKuis.js';
 import { generateOrUpdateRoadmapBab } from '../services/roadmapService.js';
 import { pilihSoalPengerjaan, soalMilikPengerjaan } from '../utils/acakSoal.js';
+import { cekKolomGambarSoal } from './SoalController.js';
+import { urlGambarSoal } from '../services/gambarSoalService.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SOAL_SELECT =
@@ -31,9 +33,13 @@ async function getOwnedAttempt(idPengerjaan, idUser) {
 }
 
 async function getQuizQuestions(idKuis) {
+  const adaGambar = await cekKolomGambarSoal();
+  const selectQuery = adaGambar
+    ? 'idSoal, idKuis, urutan, pertanyaan, gambar, difficulty, targetTime, pembahasan, ringkasan, opsi:OpsiJawaban(idOpsi, opsi, isCorrect)'
+    : SOAL_SELECT;
   const { data, error } = await supabaseAdmin
     .from('Soal')
-    .select(SOAL_SELECT)
+    .select(selectQuery)
     .eq('idKuis', idKuis)
     .order('urutan', { ascending: true, nullsFirst: false })
     .order('idSoal', { ascending: true });
@@ -232,6 +238,8 @@ export const mulaiPengerjaan = async (req, res) => {
       idSoal: question.idSoal,
       urutan: index + 1,
       pertanyaan: question.pertanyaan,
+      gambar: question.gambar ?? null,
+      gambarUrl: urlGambarSoal(question.gambar),
       difficulty: difficultyLabel(question.difficulty),
       targetTime: question.targetTime,
       opsi: (question.opsi || []).map(({ idOpsi, opsi: text }) => ({ idOpsi, opsi: text })),
@@ -466,6 +474,8 @@ export const getPembahasan = async (req, res) => {
         nomorSoal: index + 1,
         idSoal: question.idSoal,
         pertanyaan: question.pertanyaan,
+        gambar: question.gambar ?? null,
+        gambarUrl: urlGambarSoal(question.gambar),
         difficulty: difficultyLabel(question.difficulty),
         opsi: (question.opsi || []).map(({ idOpsi, opsi, isCorrect }) => ({
           idOpsi,

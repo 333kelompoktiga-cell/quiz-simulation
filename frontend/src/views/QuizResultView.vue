@@ -132,6 +132,9 @@ onMounted(async () => {
         <section v-if="tampilPembahasan" class="mt-4 flex flex-col gap-4">
           <article v-for="item in pembahasan" :key="item.idSoal" class="rounded-md border border-wf-border-subtle bg-wf-card p-5">
             <h2 class="font-semibold">{{ item.nomorSoal }}. {{ item.pertanyaan }}</h2>
+            <div v-if="item.gambarUrl" class="mt-3 rounded-lg border border-wf-border bg-white p-2 inline-block">
+              <img :src="item.gambarUrl" alt="Gambar Soal" class="max-h-48 max-w-full rounded object-contain" />
+            </div>
             <ul class="mt-3 flex flex-col gap-2">
               <li v-for="option in item.opsi" :key="option.idOpsi" :class="option.isCorrect ? 'font-semibold text-green-700' : option.dipilih ? 'text-red-700' : 'text-wf-secondary'">
                 {{ option.isCorrect ? '✓ ' : option.dipilih ? '× ' : '' }}{{ option.opsi }}
